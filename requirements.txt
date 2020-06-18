@@ -1,3 +1,4 @@
 essentia
 gmusicapi
 sqlitedict
+requests

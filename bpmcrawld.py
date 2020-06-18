@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 import sys
+import os
 import urllib.parse
 import tempfile
 import requests
-import json
 
 from gmusicapi.clients import Mobileclient
 
@@ -20,13 +20,15 @@ from calc_bpm import *
 
 # key-value database of all track's histograms ever found
 tracks_histogram_db = 'data/histograms.db'
+temp_dir = 'data/tmp'
 
-station_url = "https://play.google.com/music/r/m/Lw4jnysfpqteg7q7ojholkx2gbu?t=20__-"
-playlist_url = "https://play.google.com/music/playlist/AMaBXyn-DcjON9b8u733BIoH1YLmRPJj13LHih-wzmTbslByRRVpAGT8Jph1nq2Y2Wxmw7hW8ZAp0wggan4jHYit5Le2jWstoQ%3D%3D"
+station_url = "IFL"
 
 api = None
 
 def get_station_from_url(url):
+    if url == "IFL":
+        return {"id": "IFL", "name": "I'm Feeling Lucky"}
     station_id_str = urllib.parse.unquote(url).rsplit("/", 1)[-1].split("?", 1)[0].split('#', 1)[0]
     stations = api.get_all_stations()
     for station in stations:
@@ -34,7 +36,7 @@ def get_station_from_url(url):
             if station['seed']['curatedStationId'] == station_id_str:
                 debug(f"{whoami()}: found station {station['id']}")
                 return station
-    raise ExBpmCrawlGeneric(f"Failed to find station by string {station_id_str} (from url {url})")
+    raise ExBpmCrawlGeneric(f"Failed to find station by string '{station_id_str}' (from url '{url}')")
 
 
 def get_cached_track(track_id):
@@ -52,7 +54,7 @@ def save_cached_track(track_id, histogram):
 
 def download_track(track_id):
     """Returns tempfile object (it will be deleted upon close!)"""
-    file = tempfile.NamedTemporaryFile(mode='w+b', dir='data/tmp', prefix='track', suffix='.mp3')
+    file = tempfile.NamedTemporaryFile(mode='w+b', dir=temp_dir, prefix='track', suffix='.mp3')
     stream_url = api.get_stream_url(track_id, quality='low')
     with requests.get(stream_url, stream=True) as r:
         r.raise_for_status()
@@ -69,6 +71,13 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
     logging.getLogger("sqlitedict").setLevel(logging.ERROR)
+
+    os.makedirs(temp_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(tracks_histogram_db), exist_ok=True)
+
+    if len(sys.argv) > 1:
+        station_url = sys.argv[1]
+    info(f"using station url: {station_url}")
 
     oldloglevel = logging.getLogger().level
     logging.getLogger().setLevel(logging.ERROR)
