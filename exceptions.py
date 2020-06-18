@@ -1,0 +1,2 @@
+class ExBpmCrawlGeneric(Exception):
+    pass
