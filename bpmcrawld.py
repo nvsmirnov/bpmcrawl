@@ -98,11 +98,9 @@ if __name__ == '__main__':
                     file.close()
                     save_cached_track(track_id, histogram)
                     info(f"saved histogram for track {track_id}: {histogram}")
-                    sys.exit(0)
                 else:
                     info(f"already have cached histogram for track {track_id}: {histogram}")
-                    sys.exit(0)
         if not found_new:
-            debug(f"Probably we've seen all tracks now")
+            debug(f"Probably we've seen all tracks now, exiting")
             sys.exit(0)
         debug(f"seen {len(tracks_cache)} tracks up to time")
