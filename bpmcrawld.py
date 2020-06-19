@@ -18,10 +18,6 @@ from whoami import *
 from config import *
 from calc_bpm import *
 
-# key-value database of all track's histograms ever found
-tracks_histogram_db = 'data/histograms.db'
-temp_dir = 'data/tmp'
-
 station_url = "IFL"
 
 api = None
