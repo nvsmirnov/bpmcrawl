@@ -108,6 +108,6 @@ if __name__ == '__main__':
                 else:
                     info(f"already have cached histogram for track {track_id}: {histogram}")
         if not found_new:
-            debug(f"Probably we've seen all tracks now, exiting")
+            debug(f"Probably we've seen all tracks now ({len(tracks_cache)}), exiting")
             sys.exit(0)
         debug(f"seen {len(tracks_cache)} tracks up to time")
