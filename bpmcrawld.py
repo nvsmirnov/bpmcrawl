@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# TODO: изменить хранение в db на json - чтобы можно было глазами в БД копаться при желании
+
 import sys
 import os
 import urllib.parse
