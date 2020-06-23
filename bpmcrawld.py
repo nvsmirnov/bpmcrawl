@@ -156,7 +156,7 @@ if __name__ == '__main__':
                     info(f"saved histogram for track {track_id}: {histogram}")
                 else:
                     info(f"already have cached histogram for track {track_id}: {histogram}")
-        if playlist:
+        if not station:
             sys.exit(0)
         if not found_new:
             debug(f"Probably we've seen all tracks now ({len(tracks_cache)}), exiting")
