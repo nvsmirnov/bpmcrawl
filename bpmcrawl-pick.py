@@ -127,6 +127,8 @@ if __name__ == '__main__':
             if "track" in track:  # it is play music's track
                 tracks_in_playlist[track["track"]["storeId"]] = True
 
+    stats = {"tracks_before": len(tracks_in_playlist), "tracks_added": 0, "failures": 0}
+
     logging.getLogger().setLevel(logging.INFO)
     with SqliteDict(tracks_histogram_db, autocommit=True) as cache:
         for track_id in cache:
@@ -138,6 +140,9 @@ if __name__ == '__main__':
                     info(f"adding track {track_id} to playlist (avg={round(get_avg_bpm(good_bpms),2)}, {good_bpms})")
                     added = api.add_songs_to_playlist(playlist["id"], track_id)
                     if len(added):
+                        stats["tracks_added"] += 1
                         debug(f"added {len(added)} track(s) to playlist")
                     else:
+                        stats["failures"] += 1
                         error(f"failed to add track {id} to playlist (no reason given)")
+    info(f"bpmcrawl-pick exiting; stats: {stats}")

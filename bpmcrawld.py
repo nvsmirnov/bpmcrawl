@@ -130,10 +130,12 @@ if __name__ == '__main__':
 
     station = None
 
+    stats = {"processed": 0, "new": 0}
+
     if not playlist_name:
         station = get_station_from_url(station_url)
         info(f"Now crawling on station {station['name']}")
-    tracks_cache = []
+    tracks_cache = []  # tracks for "recently played" list
     tracks = ["first_stub"]
     while len(tracks):
         if station:
@@ -145,9 +147,11 @@ if __name__ == '__main__':
         for track in tracks:
             track_id = track['storeId']
             if track_id not in tracks_cache:
+                stats["processed"] += 1
                 histogram = get_cached_track(track_id)
                 if not histogram:
                     found_new = True
+                    stats["new"] += 1
                     file = download_track(track_id)
                     debug(f"got track {track_id} to {file.name}")
                     tracks_cache.append(track_id)
@@ -158,9 +162,10 @@ if __name__ == '__main__':
                 else:
                     info(f"already have cached histogram for track {track_id}: {histogram}")
         if not station:
-            sys.exit(0)
+            break
         if not found_new:
             debug(f"Probably we've seen all tracks now ({len(tracks_cache)}), exiting")
-            sys.exit(0)
+            break
         debug(f"seen {len(tracks_cache)} tracks up to time")
         time.sleep(1)
+    info(f"bpmcrawld exiting; stats: {stats}")
