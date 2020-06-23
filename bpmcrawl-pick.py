@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-# TODO: добавлять найденное в какой-то playlist (и создавать его если его ещё нет)
-
 import sys
 import os
 import urllib.parse
@@ -19,6 +17,8 @@ from exceptions import *
 from whoami import *
 from config import *
 from calc_bpm import *
+
+playlist_name = "bpmcrawl"
 
 api = None
 
@@ -94,10 +94,48 @@ if __name__ == '__main__':
     logging.getLogger().setLevel(oldloglevel)
     debug("logged in")
 
+    playlists = api.get_all_user_playlist_contents()
+    # find prevously created playlist with our name
+    playlist = None
+    for pl in playlists:
+        if pl["name"] == playlist_name:
+            playlist = pl
+            break
+    # playlist not found, create it
+    if not playlist:
+        debug(f"playlist {playlist_name} not found, creating it...")
+        id = api.create_playlist(playlist_name)
+        debug(f"created playlist, id {id}")
+        playlists = api.get_all_playlists()
+        for pl in playlists:
+            if pl["id"] == id:
+                playlist = pl
+                break
+    if not playlist:
+        error(f"Internal error: failed to find or create playlist {playlist_name}")
+        sys.exit(1)
+    playlists = None  # probably this will free some memory
+
+    debug(f"found target playlist")
+
+    # get tracks of playlist
+    tracks_in_playlist = {}
+    if "tracks" in playlist:
+        for track in playlist["tracks"]:
+            if "track" in track:  # it is play music's track
+                tracks_in_playlist[track["track"]["storeId"]] = True
 
     logging.getLogger().setLevel(logging.INFO)
     with SqliteDict(tracks_histogram_db, autocommit=True) as cache:
         for track_id in cache:
             good_bpms = get_good_bpms(cache[track_id], {"min": 176, "max": 184, "mult": [1, 0.5]})
             if good_bpms:
-                info(f"{track_id}: avg={round(get_avg_bpm(good_bpms),2)}, {good_bpms}")
+                if track_id in tracks_in_playlist:
+                    info(f"track {track_id} is already in playlist")
+                else:
+                    info(f"adding track {track_id} to playlist (avg={round(get_avg_bpm(good_bpms),2)}, {good_bpms})")
+                    added = api.add_songs_to_playlist(playlist["id"], track_id)
+                    if len(added):
+                        debug(f"added {len(added)} track(s) to playlist")
+                    else:
+                        error(f"failed to add track {id} to playlist (no reason given)")
