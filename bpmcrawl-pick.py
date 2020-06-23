@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# TODO: add command-line parameters: playlist name, bpm intervals
+
 import sys
 import os
 import urllib.parse
