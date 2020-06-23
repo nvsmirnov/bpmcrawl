@@ -2,3 +2,4 @@ essentia
 gmusicapi
 sqlitedict
 requests
+pytaglib
