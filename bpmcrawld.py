@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 
+#
+# If run without parameters, it will crawl on I'm Feeling Locky station
+# If single parameter given - it will be treated as station URL
+# If -p playlist given, playlist will be treated as own playlist name or as shared playlist url (if begins with http...)
+#
+
 # TODO: изменить хранение в db на json - чтобы можно было глазами в БД копаться при желании
 
 import sys
@@ -21,6 +27,7 @@ from config import *
 from calc_bpm import *
 
 station_url = "IFL"
+playlist_name = None
 
 api = None
 
@@ -35,6 +42,31 @@ def get_station_from_url(url):
                 debug(f"{whoami()}: found station {station['id']}")
                 return station
     raise ExBpmCrawlGeneric(f"Failed to find station by string '{station_id_str}' (from url '{url}')")
+
+
+def get_playlist_tracks_from_url(url):
+    if url.lower().startswith('http'):
+        # this is playlist url
+        error(f"playlist by URL is not implemented yet")
+        sys.exit(1)
+    else:
+        # this is local playlist name
+        playlists = api.get_all_user_playlist_contents()
+        # find prevously created playlist with our name
+        playlist = None
+        for pl in playlists:
+            if pl["name"] == playlist_name:
+                playlist = pl
+                break
+        tracks_in_playlist = {}
+        tracks = []
+        if "tracks" in playlist:
+            for track in playlist["tracks"]:
+                if "track" in track:  # it is play music's track
+                    if track["track"]["storeId"] not in tracks_in_playlist:
+                        tracks.append(track["track"])
+                        tracks_in_playlist[track["track"]["storeId"]] = True
+        return tracks
 
 
 def get_cached_track(track_id):
@@ -73,9 +105,17 @@ if __name__ == '__main__':
     os.makedirs(temp_dir, exist_ok=True)
     os.makedirs(os.path.dirname(tracks_histogram_db), exist_ok=True)
 
+    # oh, I know 'bout argparse, but... :-)
     if len(sys.argv) > 1:
-        station_url = sys.argv[1]
-    info(f"using station url: {station_url}")
+        if len(sys.argv) == 2:
+            station_url = sys.argv[1]
+            info(f"using station url: {station_url}")
+        elif sys.argv[1] == '-p':
+            playlist_name = sys.argv[2]
+            info(f"using playlist: {playlist_name}")
+        else:
+            error(f"parameters: station_url | -p playlist_name_or_shared_playlist_url")
+            sys.exit(1)
 
     oldloglevel = logging.getLogger().level
     logging.getLogger().setLevel(logging.ERROR)
@@ -87,12 +127,19 @@ if __name__ == '__main__':
     logging.getLogger().setLevel(oldloglevel)
     debug("logged in")
 
-    station = get_station_from_url(station_url)
-    info(f"Now crawling on station {station['name']}")
+    station = None
+
+    if not playlist_name:
+        station = get_station_from_url(station_url)
+        info(f"Now crawling on station {station['name']}")
     tracks_cache = []
     tracks = ["first_stub"]
     while len(tracks):
-        tracks = api.get_station_tracks(station['id'], num_tracks=25, recently_played_ids=tracks_cache)
+        if station:
+            tracks = api.get_station_tracks(station['id'], num_tracks=25, recently_played_ids=tracks_cache)
+        else:
+            tracks = get_playlist_tracks_from_url(playlist_name)
+            info(f"Got {len(tracks)} track(s) from {playlist_name}")
         found_new = False
         for track in tracks:
             track_id = track['storeId']
@@ -109,6 +156,8 @@ if __name__ == '__main__':
                     info(f"saved histogram for track {track_id}: {histogram}")
                 else:
                     info(f"already have cached histogram for track {track_id}: {histogram}")
+        if playlist:
+            sys.exit(0)
         if not found_new:
             debug(f"Probably we've seen all tracks now ({len(tracks_cache)}), exiting")
             sys.exit(0)
