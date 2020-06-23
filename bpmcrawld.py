@@ -13,6 +13,7 @@ import os
 import urllib.parse
 import tempfile
 import requests
+import time
 
 from gmusicapi.clients import Mobileclient
 
@@ -162,3 +163,4 @@ if __name__ == '__main__':
             debug(f"Probably we've seen all tracks now ({len(tracks_cache)}), exiting")
             sys.exit(0)
         debug(f"seen {len(tracks_cache)} tracks up to time")
+        time.sleep(1)
