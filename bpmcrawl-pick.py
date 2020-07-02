@@ -20,7 +20,7 @@ from whoami import *
 from config import *
 from calc_bpm import *
 
-playlist_name = "bpmcrawl"
+playlist_name = "bpmcrawl.180-"
 
 api = None
 
@@ -29,6 +29,7 @@ def get_scaled_good_bpm(bpm, good_bpm):
     Вернёт значение bpm, приведённое с учётом множителя, если bpm попадает в good_bpm (формат см. в get_good_bpms)
     None если не попало
     """
+    bpm = float(bpm)
     for mult in good_bpm["mult"]:
         if bpm >= mult*good_bpm["min"] and bpm <= mult*good_bpm["max"]:
             return bpm/mult
@@ -45,7 +46,7 @@ def get_avg_bpm(histogram: dict):
     return sum/sum_shares
 
 
-def get_good_bpms(histogram: dict, good_bpm, min_share=0.9):
+def get_good_bpms(histogram: dict, good_bpm, min_share=0.85):
     """
     Если доля "хороших" bpm >= min_share, то вернёт dict:
         {bpm1: share1, bpm2: share2}
@@ -85,6 +86,10 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
     logging.getLogger("sqlitedict").setLevel(logging.ERROR)
+
+    if not is_cache_version_ok():
+        print(f"wrong cache version, convert or delete it ({tracks_histogram_db})", file=sys.stderr)
+        sys.exit(1)
 
     oldloglevel = logging.getLogger().level
     logging.getLogger().setLevel(logging.ERROR)
@@ -130,16 +135,29 @@ if __name__ == '__main__':
     stats = {"tracks_before": len(tracks_in_playlist), "tracks_added": 0, "failures": 0}
 
     logging.getLogger().setLevel(logging.INFO)
-    with SqliteDict(tracks_histogram_db, autocommit=True) as cache:
+    with SqliteDict(tracks_histogram_db, autocommit=True, encode=json.dumps, decode=json.loads) as cache:
         for track_id in cache:
-            good_bpms = get_good_bpms(cache[track_id], {"min": 176, "max": 184, "mult": [1, 0.5]})
+            if track_id == cache_db_version_recordid:
+                continue
+            cached = cache[track_id]
+            good_bpms = get_good_bpms(cached["histogram"], {"min": 174, "max": 180, "mult": [1, 0.5]})
             if good_bpms:
                 if track_id in tracks_in_playlist:
+                    if "in_playlists" not in cached:
+                        cached["in_playlists"] = []
+                    if playlist["id"] not in cached["in_playlists"]:
+                        cached["in_playlists"].append(playlist["id"])
+                    cache[track_id] = cached
                     info(f"track {track_id} is already in playlist")
                 else:
                     info(f"adding track {track_id} to playlist (avg={round(get_avg_bpm(good_bpms),2)}, {good_bpms})")
                     added = api.add_songs_to_playlist(playlist["id"], track_id)
                     if len(added):
+                        if "in_playlists" not in cached:
+                            cached["in_playlists"] = []
+                        if playlist["id"] not in cached["in_playlists"]:
+                            cached["in_playlists"].append(playlist["id"])
+                        cache[track_id] = cached
                         stats["tracks_added"] += 1
                         debug(f"added {len(added)} track(s) to playlist")
                     else:

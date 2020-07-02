@@ -14,6 +14,7 @@ import urllib.parse
 import tempfile
 import requests
 import time
+import json
 
 from gmusicapi.clients import Mobileclient
 
@@ -71,16 +72,22 @@ def get_playlist_tracks_from_url(url):
 
 
 def get_cached_track(track_id):
-    with SqliteDict(tracks_histogram_db, autocommit=True) as cache:
+    with SqliteDict(tracks_histogram_db, autocommit=True, encode=json.dumps, decode=json.loads) as cache:
         try:
-            return cache[track_id]
+            cached = cache[track_id]
         except KeyError:
             return None
+        try:
+            return cached["histogram"]
+        except KeyError:
+            error(f"{whoami()}: internal error loading data from cache for track {track_id}")
+            sys.exit(1)
 
 
 def save_cached_track(track_id, histogram):
-    with SqliteDict(tracks_histogram_db, autocommit=True) as cache:
-        cache[track_id] = histogram
+    """warning: for now, it will override all data saved for this track"""
+    with SqliteDict(tracks_histogram_db, autocommit=True, encode=json.dumps, decode=json.loads) as cache:
+        cache[track_id] = {"histogram": histogram}
 
 
 def download_track(track_id):
@@ -117,6 +124,10 @@ if __name__ == '__main__':
         else:
             error(f"parameters: station_url | -p playlist_name_or_shared_playlist_url")
             sys.exit(1)
+
+    if not is_cache_version_ok():
+        print(f"wrong cache version, convert or delete it ({tracks_histogram_db})", file=sys.stderr)
+        sys.exit(1)
 
     oldloglevel = logging.getLogger().level
     logging.getLogger().setLevel(logging.ERROR)
