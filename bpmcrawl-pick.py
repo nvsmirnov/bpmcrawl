@@ -120,7 +120,6 @@ if __name__ == '__main__':
     debug(f"playlist_name = '{playlist_name}'")
     debug(f"accept_bpm    = {accept_bpm}")
     debug(f"reload        = {args.reload}")
-    sys.exit(1)
 
     if not is_cache_version_ok():
         print(f"wrong cache version, convert or delete it ({tracks_histogram_db})", file=sys.stderr)
