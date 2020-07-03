@@ -169,7 +169,6 @@ if __name__ == '__main__':
 
     stats = {"tracks_before": len(tracks_in_playlist), "tracks_added": 0, "failures": 0}
 
-    logging.getLogger().setLevel(logging.INFO)
     with SqliteDict(tracks_histogram_db, autocommit=True, encode=json.dumps, decode=json.loads) as cache:
         for track_id in cache:
             if track_id == cache_db_version_recordid:
