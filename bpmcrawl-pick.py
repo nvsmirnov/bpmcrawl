@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
-# TODO: add command-line parameters: playlist name, bpm intervals
-
 import sys
 import os
 import urllib.parse
 import tempfile
 import requests
+import re
+import argparse
 
 from gmusicapi.clients import Mobileclient
 
@@ -20,7 +20,7 @@ from whoami import *
 from config import *
 from calc_bpm import *
 
-playlist_name = "bpmcrawl.180-"
+playlist_name = "bpmcrawl"
 
 api = None
 
@@ -83,14 +83,50 @@ def get_good_bpms(histogram: dict, good_bpm, min_share=0.85):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
     logging.getLogger("sqlitedict").setLevel(logging.ERROR)
+
+    parser = argparse.ArgumentParser(
+        description=f'Pick tracks from cache created by bpmcrawld (file {tracks_histogram_db}) and load them to Google Music playlist',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-p', '--playlist', default=playlist_name, type=str,
+                        help=f'Playlist name to add tracks to, will be created if does not exists')
+    parser.add_argument('-b', '--bpm', default='176-184', type=str,
+                        help=f'BPM range (with any of multipliers applied also)')
+    parser.add_argument('-m', '--mult', default=[1, 0.5], nargs='+', type=float,
+                        help=f'Multipliers to BPM range. I.e., if range is 176-180 and multipliers are [1, 0.5], then good BPM ranges are 176-184 and 88-92')
+    parser.add_argument('-r', '--reload', default=False, action='store_true',
+                        help=
+                        f'Do not rely on locally cached info about whether track was already added to playlist or not.\n'
+                        f'Without this option, you may remove tracks from playlist manually and they will not be re-added')
+    parser.add_argument('-d', '--debug', default=False, action='store_true',
+                        help=f'Enable debugging output')
+
+    args = parser.parse_args()
+
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+        debug("enabled debug")
+
+    playlist_name = args.playlist
+
+    m = re.match('^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$', args.bpm)
+    if not m:
+        error(f'Wrong format for BPM range ({args.bpm}), will accept this form: 176-184')
+        sys.exit(1)
+    accept_bpm = {"min": float(m.group(1)), "max": float(m.group(2)), "mult": args.mult}
+
+    debug(f"playlist_name = '{playlist_name}'")
+    debug(f"accept_bpm    = {accept_bpm}")
+    debug(f"reload        = {args.reload}")
+    sys.exit(1)
 
     if not is_cache_version_ok():
         print(f"wrong cache version, convert or delete it ({tracks_histogram_db})", file=sys.stderr)
         sys.exit(1)
 
+    # log in to google music suppressing it's debugging messages
     oldloglevel = logging.getLogger().level
     logging.getLogger().setLevel(logging.ERROR)
     api = Mobileclient(debug_logging=False)
@@ -101,8 +137,8 @@ if __name__ == '__main__':
     logging.getLogger().setLevel(oldloglevel)
     debug("logged in")
 
-    playlists = api.get_all_user_playlist_contents()
     # find prevously created playlist with our name
+    playlists = api.get_all_user_playlist_contents()
     playlist = None
     for pl in playlists:
         if pl["name"] == playlist_name:
@@ -140,27 +176,31 @@ if __name__ == '__main__':
             if track_id == cache_db_version_recordid:
                 continue
             cached = cache[track_id]
-            good_bpms = get_good_bpms(cached["histogram"], {"min": 174, "max": 180, "mult": [1, 0.5]})
+            good_bpms = get_good_bpms(cached["histogram"], accept_bpm)
             if good_bpms:
-                if track_id in tracks_in_playlist:
-                    if "in_playlists" not in cached:
-                        cached["in_playlists"] = []
-                    if playlist["id"] not in cached["in_playlists"]:
-                        cached["in_playlists"].append(playlist["id"])
-                    cache[track_id] = cached
-                    info(f"track {track_id} is already in playlist")
+                if not args.reload and "in_playlists" in cached and playlist["id"] in cached["in_playlists"]:
+                    # cache says that we already added this track, and no -r option given
+                    debug(f"track {track_id} was added to playlist earlier (got this from cache)")
                 else:
-                    info(f"adding track {track_id} to playlist (avg={round(get_avg_bpm(good_bpms),2)}, {good_bpms})")
-                    added = api.add_songs_to_playlist(playlist["id"], track_id)
-                    if len(added):
+                    if track_id in tracks_in_playlist:
                         if "in_playlists" not in cached:
                             cached["in_playlists"] = []
                         if playlist["id"] not in cached["in_playlists"]:
                             cached["in_playlists"].append(playlist["id"])
                         cache[track_id] = cached
-                        stats["tracks_added"] += 1
-                        debug(f"added {len(added)} track(s) to playlist")
+                        debug(f"track {track_id} is already in playlist")
                     else:
-                        stats["failures"] += 1
-                        error(f"failed to add track {id} to playlist (no reason given)")
+                        info(f"adding track {track_id} to playlist (avg={round(get_avg_bpm(good_bpms),2)}, {good_bpms})")
+                        added = api.add_songs_to_playlist(playlist["id"], track_id)
+                        if len(added):
+                            if "in_playlists" not in cached:
+                                cached["in_playlists"] = []
+                            if playlist["id"] not in cached["in_playlists"]:
+                                cached["in_playlists"].append(playlist["id"])
+                            cache[track_id] = cached
+                            stats["tracks_added"] += 1
+                            info(f"added track {track_id} to playlist {playlist_name}")
+                        else:
+                            stats["failures"] += 1
+                            error(f"failed to add track {id} to playlist (no reason given)")
     info(f"bpmcrawl-pick exiting; stats: {stats}")
