@@ -75,10 +75,10 @@ def get_good_bpms(histogram: dict, good_bpm, min_share=0.85):
     #debug(f"{whoami()}: orig={histogram}")
     #debug(f"{whoami()}: good={good_bpms}")
     if sum_good_share < min_share:
-        debug(f"{whoami()}: returning None")
+        #debug(f"{whoami()}: returning None")
         return None
 
-    debug(f"{whoami()}: returning {good_bpms}")
+    #debug(f"{whoami()}: returning {good_bpms}")
     return good_bpms
 
 
