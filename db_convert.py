@@ -53,6 +53,7 @@ if __name__ == '__main__':
 
     if (db_version == None) and (cache_db_version == "2"):
         # migrate from v1 to v2
+        # it changes format to json, and moves cached data to "histogram" key of stored dict
         rm_tmp()
         get_cache_version(new_db)  # this will create empty database
         with SqliteDict(tracks_histogram_db, autocommit=True) as old_cache:
@@ -60,6 +61,27 @@ if __name__ == '__main__':
                 for trackid in old_cache:
                     new_cache[trackid] = {"histogram": old_cache[trackid]}
                 if len(old_cache)+1 != len(new_cache):
+                    error(f"{whoami()}: internal error: len(old_cache)+1 ({len(old_cache)+1}) != len(new_cache) ({len(new_cache)})")
+                    sys.exit(1)
+                info(f"migrated {len(new_cache)-1} records")
+        info(f"replacing file f{tracks_histogram_db} with new version, preserving old to {tracks_histogram_db+'.bak'}")
+        shutil.move(tracks_histogram_db, tracks_histogram_db+".bak")
+        shutil.move(new_db, tracks_histogram_db)
+    elif (db_version == "2") and (cache_db_version == "3"):
+        # migrate from v2 to v3
+        # it adds music service provider name to cache_id
+        #   was: 'some_id': { 'histogram': data }
+        #   now: 'provider:some_id': { 'histogram': data }
+        #   and only provider known for version 2 is gmusic, so it will be 'gmusic:some_id'
+        rm_tmp()
+        get_cache_version(new_db)  # this will create empty database
+        with SqliteDict(tracks_histogram_db, autocommit=True, encode=json.dumps, decode=json.loads) as old_cache:
+            with SqliteDict(new_db, autocommit=True, encode=json.dumps, decode=json.loads) as new_cache:
+                for trackid in old_cache:
+                    if trackid != cache_db_version_recordid:
+                        # db version record already was added when db was created
+                        new_cache["gmusic:"+trackid] = old_cache[trackid]
+                if len(old_cache) != len(new_cache):
                     error(f"{whoami()}: internal error: len(old_cache)+1 ({len(old_cache)+1}) != len(new_cache) ({len(new_cache)})")
                     sys.exit(1)
                 info(f"migrated {len(new_cache)-1} records")

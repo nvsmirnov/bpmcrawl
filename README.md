@@ -7,9 +7,9 @@ python -m venv venv
 
 pip install -r requirements.txt
 
-Сперва надо запустить gmusic-login и следовать указаниям.
+Для Google Music: сперва надо запустить gmusic-login и следовать указаниям.
 
-./bpmcrawld.py [station URL | -p playlist_name]
+./bpmcrawld.py -s gmusic [--station URL | -p playlist_name]
 Будет извлекать (путём расчёта) из всех треков информацию о BPM и сохранять в histogram.db
 По умолчанию будет обрабатывать станцию I'm Feeling Lucky (IFL).
 Можно запускать несколько раз - Google Music в IFL может давать разные выдачи. Можно попробовать запускать из cron, например.
@@ -19,6 +19,6 @@ pip install -r requirements.txt
 
 Т.е. сценарий запуска - сперва bpmcrawld, затем bpmcrawl-pick.
 
-Если вдруг начала появляться ругань в духе Access Denied или вроде того, можно попробовать перелогиниться в Google Music.
+Если при использовании Google Music вдруг начала появляться ругань в духе Access Denied или вроде того, можно попробовать перелогиниться в Google Music.
 Для этого надо удалить файл ~/.local/share/gmusicapi/mobileclient.cred и запустить ./gmusic-login.py
 

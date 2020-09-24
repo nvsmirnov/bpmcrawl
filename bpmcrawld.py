@@ -6,8 +6,6 @@
 # If -p playlist given, playlist will be treated as own playlist name or as shared playlist url (if begins with http...)
 #
 
-# TODO: изменить хранение в db на json - чтобы можно было глазами в БД копаться при желании
-
 import sys
 import os
 import urllib.parse
@@ -15,8 +13,10 @@ import tempfile
 import requests
 import time
 import json
+import argparse
 
-from gmusicapi.clients import Mobileclient
+from music_api import *
+#from gmusicapi.clients import Mobileclient
 
 from sqlitedict import SqliteDict
 
@@ -28,23 +28,10 @@ from whoami import *
 from config import *
 from calc_bpm import *
 
-station_url = "IFL"
+station_url = None
 playlist_name = None
 
 api = None
-
-def get_station_from_url(url):
-    if url == "IFL":
-        return {"id": "IFL", "name": "I'm Feeling Lucky"}
-    station_id_str = urllib.parse.unquote(url).rsplit("/", 1)[-1].split("?", 1)[0].split('#', 1)[0]
-    stations = api.get_all_stations()
-    for station in stations:
-        if 'seed' in station and 'curatedStationId' in station['seed']:
-            if station['seed']['curatedStationId'] == station_id_str:
-                debug(f"{whoami()}: found station {station['id']}")
-                return station
-    raise ExBpmCrawlGeneric(f"Failed to find station by string '{station_id_str}' (from url '{url}')")
-
 
 def get_playlist_tracks_from_url(url):
     if url.lower().startswith('http'):
@@ -106,37 +93,43 @@ def download_track(track_id):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
     logging.getLogger("sqlitedict").setLevel(logging.ERROR)
 
+    parser = argparse.ArgumentParser(
+        description=f'Get the tracks from playlist, analyze them and add info to cache database ({tracks_histogram_db})',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-s', '--service', type=str,
+                        required=True, choices=music_service_mapping.keys(),
+                        help=f'Specify which music service provider to use')
+    parser.add_argument('--station', type=str,
+                        default='IFL',
+                        help=f'For gmusic: station URL to analyze (special name IFL stands for "I feel lucky" station)')
+    parser.add_argument('-p', '--playlist', type=str,
+                        help=f'Playlist name or URL. If specified, will override --station')
+    parser.add_argument('-d', '--debug', default=False, action='store_true',
+                        help=f'Enable debugging output')
+
+    args = parser.parse_args()
+
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+        debug("enabled debug")
+
+    music_service = args.service
+    station_url = args.station
+    playlist_name = args.playlist
+
     os.makedirs(temp_dir, exist_ok=True)
     os.makedirs(os.path.dirname(tracks_histogram_db), exist_ok=True)
-
-    # oh, I know 'bout argparse, but... :-)
-    if len(sys.argv) > 1:
-        if len(sys.argv) == 2:
-            station_url = sys.argv[1]
-            info(f"using station url: {station_url}")
-        elif sys.argv[1] == '-p':
-            playlist_name = sys.argv[2]
-            info(f"using playlist: {playlist_name}")
-        else:
-            error(f"parameters: station_url | -p playlist_name_or_shared_playlist_url")
-            sys.exit(1)
 
     if not is_cache_version_ok():
         print(f"wrong cache version, convert or delete it ({tracks_histogram_db})", file=sys.stderr)
         sys.exit(1)
 
-    oldloglevel = logging.getLogger().level
-    logging.getLogger().setLevel(logging.ERROR)
-    api = Mobileclient(debug_logging=False)
-    logging.getLogger("gmusicapi.Mobileclient1").setLevel(logging.WARNING)
-    if not api.oauth_login(gmusic_client_id):
-        print(f"Please login to Google Music first (run gmusic-login.py)")
-        sys.exit(1)
-    logging.getLogger().setLevel(oldloglevel)
+    api = get_music_provider(music_service)
+    api.login()
     debug("logged in")
 
     station = None
@@ -144,9 +137,34 @@ if __name__ == '__main__':
     stats = {"processed": 0, "new": 0}
 
     if not playlist_name:
-        station = get_station_from_url(station_url)
-        info(f"Now crawling on station {station['name']}")
-    tracks_cache = []  # tracks for "recently played" list
+        station = api.get_station_from_url(station_url)
+        api.station_prepare()
+        info(f"Now crawling on station {api.get_station_name(station)}")
+    else:
+        ERRR_MODIFY_TO_MULTISERVICE
+
+    stop = False
+    while not stop:
+        track = api.station_get_next_track()
+        if not track:
+            stop = True
+            break
+        track_id = api.get_track_id(track)
+        stats["processed"] += 1
+        histogram = ERRR_MODIFY_TO_MULTISERVICE get_cached_track(music_service, track_id)
+        if not histogram:
+            stats["new"] += 1
+            file = ERRR_MODIFY_TO_MULTISERVICE download_track(track_id)
+            debug(f"got track {track_id} to {file.name}")
+            histogram = calc_bpm_histogram(file.name)
+            file.close()
+            ERRR_MODIFY_TO_MULTISERVICE save_cached_track(music_service, track_id, histogram)
+            info(f"saved histogram for track {track_id}: {histogram}")
+        else:
+            info(f"already have cached histogram for track {track_id}: {histogram}")
+
+    ERRR_MODIFY_TO_MULTISERVICE
+#### old code from here
     tracks = ["first_stub"]
     while len(tracks):
         if station:
@@ -179,4 +197,5 @@ if __name__ == '__main__':
             break
         debug(f"seen {len(tracks_cache)} tracks up to time")
         time.sleep(1)
+### old code
     info(f"bpmcrawld exiting; stats: {stats}")

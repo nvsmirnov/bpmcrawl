@@ -8,7 +8,7 @@ import requests
 import re
 import argparse
 
-from gmusicapi.clients import Mobileclient
+from music_api import *
 
 from sqlitedict import SqliteDict
 
@@ -83,122 +83,99 @@ def get_good_bpms(histogram: dict, good_bpm, min_share=0.85):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    logging.getLogger("urllib3").setLevel(logging.ERROR)
-    logging.getLogger("sqlitedict").setLevel(logging.ERROR)
+    try:
+        logging.basicConfig(level=logging.INFO)
+        logging.getLogger("urllib3").setLevel(logging.ERROR)
+        logging.getLogger("sqlitedict").setLevel(logging.ERROR)
 
-    parser = argparse.ArgumentParser(
-        description=f'Pick tracks from cache created by bpmcrawld (file {tracks_histogram_db}) and load them to Google Music playlist',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-p', '--playlist', default=playlist_name, type=str,
-                        help=f'Playlist name to add tracks to, will be created if does not exists')
-    parser.add_argument('-b', '--bpm', default='176-184', type=str,
-                        help=f'BPM range (with any of multipliers applied also)')
-    parser.add_argument('-m', '--mult', default=[1, 0.5], nargs='+', type=float,
-                        help=f'Multipliers to BPM range. I.e., if range is 176-180 and multipliers are [1, 0.5], then good BPM ranges are 176-184 and 88-92')
-    parser.add_argument('-r', '--reload', default=False, action='store_true',
-                        help=
-                        f'Do not rely on locally cached info about whether track was already added to playlist or not.\n'
-                        f'Without this option, you may remove tracks from playlist manually and they will not be re-added')
-    parser.add_argument('-d', '--debug', default=False, action='store_true',
-                        help=f'Enable debugging output')
+        parser = argparse.ArgumentParser(
+            description=f'Pick tracks from cache created by bpmcrawld (file {tracks_histogram_db}) and load them to playlist of specified music provider',
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        parser.add_argument('-s', '--service', type=str,
+                            required=True, choices=music_service_mapping.keys(),
+                            help=f'Specify which music service provider to use')
+        parser.add_argument('-p', '--playlist', default=playlist_name, type=str,
+                            help=f'Playlist name to add tracks to, will be created if does not exists')
+        parser.add_argument('-b', '--bpm', default='176-184', type=str,
+                            help=f'BPM range (with any of multipliers applied also)')
+        parser.add_argument('-m', '--mult', default=[1, 0.5], nargs='+', type=float,
+                            help=f'Multipliers to BPM range. I.e., if range is 176-180 and multipliers are [1, 0.5], then good BPM ranges are 176-184 and 88-92')
+        parser.add_argument('-r', '--reload', default=False, action='store_true',
+                            help=
+                            f'Do not rely on locally cached info about whether track was already added to playlist or not.\n'
+                            f'Without this option, you may remove tracks from playlist manually and they will not be re-added')
+        parser.add_argument('-d', '--debug', default=False, action='store_true',
+                            help=f'Enable debugging output')
 
-    args = parser.parse_args()
+        args = parser.parse_args()
 
-    if args.debug:
-        logging.getLogger().setLevel(logging.DEBUG)
-        debug("enabled debug")
+        if args.debug:
+            logging.getLogger().setLevel(logging.DEBUG)
+            debug("enabled debug")
 
-    playlist_name = args.playlist
+        playlist_name = args.playlist
+        music_service = args.service
 
-    m = re.match('^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$', args.bpm)
-    if not m:
-        error(f'Wrong format for BPM range ({args.bpm}), will accept this form: 176-184')
-        sys.exit(1)
-    accept_bpm = {"min": float(m.group(1)), "max": float(m.group(2)), "mult": args.mult}
+        m = re.match('^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$', args.bpm)
+        if not m:
+            error(f'Wrong format for BPM range ({args.bpm}), will accept this form: 176-184')
+            sys.exit(1)
+        accept_bpm = {"min": float(m.group(1)), "max": float(m.group(2)), "mult": args.mult}
 
-    debug(f"playlist_name = '{playlist_name}'")
-    debug(f"accept_bpm    = {accept_bpm}")
-    debug(f"reload        = {args.reload}")
+        debug(f"playlist_name = '{playlist_name}'")
+        debug(f"accept_bpm    = {accept_bpm}")
+        debug(f"reload        = {args.reload}")
 
-    if not is_cache_version_ok():
-        print(f"wrong cache version, convert or delete it ({tracks_histogram_db})", file=sys.stderr)
-        sys.exit(1)
+        if not is_cache_version_ok():
+            print(f"wrong cache version ({tracks_histogram_db}), delete it or convert it with db_convert", file=sys.stderr)
+            sys.exit(1)
 
-    # log in to google music suppressing it's debugging messages
-    oldloglevel = logging.getLogger().level
-    logging.getLogger().setLevel(logging.ERROR)
-    api = Mobileclient(debug_logging=False)
-    logging.getLogger("gmusicapi.Mobileclient1").setLevel(logging.WARNING)
-    if not api.oauth_login(gmusic_client_id):
-        print(f"Please login to Google Music first (run gmusic-login.py)")
-        sys.exit(1)
-    logging.getLogger().setLevel(oldloglevel)
-    debug("logged in")
+        api = get_music_provider(music_service)
+        api.login()
+        debug("logged in")
 
-    # find prevously created playlist with our name
-    playlists = api.get_all_user_playlist_contents()
-    playlist = None
-    for pl in playlists:
-        if pl["name"] == playlist_name:
-            playlist = pl
-            break
-    # playlist not found, create it
-    if not playlist:
-        debug(f"playlist {playlist_name} not found, creating it...")
-        id = api.create_playlist(playlist_name)
-        debug(f"created playlist, id {id}")
-        playlists = api.get_all_playlists()
-        for pl in playlists:
-            if pl["id"] == id:
-                playlist = pl
-                break
-    if not playlist:
-        error(f"Internal error: failed to find or create playlist {playlist_name}")
-        sys.exit(1)
-    playlists = None  # probably this will free some memory
+        playlist = api.get_or_create_playlist(playlist_name)
+        debug(f"found target playlist")
 
-    debug(f"found target playlist")
+        tracks_in_playlist = api.get_playlist_tracks(playlist)
 
-    # get tracks of playlist
-    tracks_in_playlist = {}
-    if "tracks" in playlist:
-        for track in playlist["tracks"]:
-            if "track" in track:  # it is play music's track
-                tracks_in_playlist[track["track"]["storeId"]] = True
+        stats = {"tracks_before": len(tracks_in_playlist), "tracks_added": 0, "failures": 0}
 
-    stats = {"tracks_before": len(tracks_in_playlist), "tracks_added": 0, "failures": 0}
-
-    with SqliteDict(tracks_histogram_db, autocommit=True, encode=json.dumps, decode=json.loads) as cache:
-        for track_id in cache:
-            if track_id == cache_db_version_recordid:
-                continue
-            cached = cache[track_id]
-            good_bpms = get_good_bpms(cached["histogram"], accept_bpm)
-            if good_bpms:
-                if not args.reload and "in_playlists" in cached and playlist["id"] in cached["in_playlists"]:
-                    # cache says that we already added this track, and no -r option given
-                    debug(f"track {track_id} was added to playlist earlier (got this from cache)")
-                else:
-                    if track_id in tracks_in_playlist:
-                        if "in_playlists" not in cached:
-                            cached["in_playlists"] = []
-                        if playlist["id"] not in cached["in_playlists"]:
-                            cached["in_playlists"].append(playlist["id"])
-                        cache[track_id] = cached
-                        debug(f"track {track_id} is already in playlist")
+        with SqliteDict(tracks_histogram_db, autocommit=True, encode=json.dumps, decode=json.loads) as cache:
+            for track in cache:
+                if track == cache_db_version_recordid:
+                    continue
+                if get_track_provider_from_cache_id(track) != music_service:
+                    continue
+                track_id = get_track_id_from_cache_id(track)
+                cached = cache[track]
+                good_bpms = get_good_bpms(cached["histogram"], accept_bpm)
+                if good_bpms:
+                    if not args.reload and "in_playlists" in cached and playlist["id"] in cached["in_playlists"]:
+                        # cache says that we already added this track, and no -r option given
+                        debug(f"track {track_id} was added to playlist earlier (got this from cache)")
                     else:
-                        info(f"adding track {track_id} to playlist (avg={round(get_avg_bpm(good_bpms),2)}, {good_bpms})")
-                        added = api.add_songs_to_playlist(playlist["id"], track_id)
-                        if len(added):
+                        if track_id in tracks_in_playlist:
                             if "in_playlists" not in cached:
                                 cached["in_playlists"] = []
                             if playlist["id"] not in cached["in_playlists"]:
                                 cached["in_playlists"].append(playlist["id"])
-                            cache[track_id] = cached
-                            stats["tracks_added"] += 1
-                            info(f"added track {track_id} to playlist {playlist_name}")
+                            cache[track] = cached
+                            debug(f"track {track_id} is already in playlist (added this info to cache)")
                         else:
-                            stats["failures"] += 1
-                            error(f"failed to add track {id} to playlist (no reason given)")
-    info(f"bpmcrawl-pick exiting; stats: {stats}")
+                            info(f"adding track {track_id} to playlist (avg={round(get_avg_bpm(good_bpms),2)}, {good_bpms})")
+                            if api.add_track_to_playlist(playlist["id"], track_id):
+                                if "in_playlists" not in cached:
+                                    cached["in_playlists"] = []
+                                if playlist["id"] not in cached["in_playlists"]:
+                                    cached["in_playlists"].append(playlist["id"])
+                                cache[track] = cached
+                                stats["tracks_added"] += 1
+                                info(f"added track {track_id} to playlist {playlist_name}")
+                            else:
+                                stats["failures"] += 1
+                                error(f"failed to add track {id} to playlist (no reason given)")
+        info(f"bpmcrawl-pick exiting; stats: {stats}")
+    except ExBpmCrawlGeneric as e:
+        debug(f"Got exception:", exc_info=True)
+        error(str(e))
