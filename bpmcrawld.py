@@ -33,31 +33,6 @@ playlist_name = None
 
 api = None
 
-def get_playlist_tracks_from_url(url):
-    if url.lower().startswith('http'):
-        # this is playlist url
-        error(f"playlist by URL is not implemented yet")
-        sys.exit(1)
-    else:
-        # this is local playlist name
-        playlists = api.get_all_user_playlist_contents()
-        # find prevously created playlist with our name
-        playlist = None
-        for pl in playlists:
-            if pl["name"] == playlist_name:
-                playlist = pl
-                break
-        tracks_in_playlist = {}
-        tracks = []
-        if "tracks" in playlist:
-            for track in playlist["tracks"]:
-                if "track" in track:  # it is play music's track
-                    if track["track"]["storeId"] not in tracks_in_playlist:
-                        tracks.append(track["track"])
-                        tracks_in_playlist[track["track"]["storeId"]] = True
-        return tracks
-
-
 def get_cached_track(music_service, track_id):
     with SqliteDict(tracks_histogram_db, autocommit=True, encode=json.dumps, decode=json.loads) as cache:
         try:
@@ -127,11 +102,23 @@ if __name__ == '__main__':
         api.station_prepare(station)
         info(f"Now crawling on station {api.get_station_name(station)}")
     else:
-        ERRR_MODIFY_TO_MULTISERVICE
+        playlist_tracks = api.get_playlist_tracks(playlist_name)
+        if playlist_tracks is None:
+            info(f"Playlist not found: {playlist_name}")
+            sys.exit(1)
+        playlist_current_track = 0
+        info(f"Now crawling on playlist {playlist_name} ({len(playlist_tracks)} tracks)")
 
     stop = False
     while not stop:
-        track = api.station_get_next_track()
+        if not playlist_name:
+            track = api.station_get_next_track()
+        else:
+            if playlist_current_track < len(playlist_tracks):
+                track = playlist_tracks[playlist_current_track]
+                playlist_current_track += 1
+            else:
+                track = None
         if not track:
             stop = True
             break

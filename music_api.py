@@ -90,12 +90,16 @@ class MusicproviderBase(WhoamiObject):
         :param station: station returned by get_station_from_url
         :return: None if there is no unseen tracks to play
         """
+        raise ExBpmCrawlGeneric(f"Internal error: Method {self.whoami()} is not implemented")
+
     def get_track_id(self, track):
         """
         Get track id for given track. Track id is used to save track info to cache databse.
         :param track: track returned by station_get_next_track, or track of playlist
         :return: String with track id
         """
+        raise ExBpmCrawlGeneric(f"Internal error: Method {self.whoami()} is not implemented")
+
     def download_track(self, track):
         """
         Download track to file and return Tempfile object.
@@ -103,6 +107,16 @@ class MusicproviderBase(WhoamiObject):
         :param track: track returned by station_get_next_track, or track of playlist
         :return: tempfile object with track data
         """
+        raise ExBpmCrawlGeneric(f"Internal error: Method {self.whoami()} is not implemented")
+
+    def get_playlist_tracks(self, playlist_name):
+        """
+        Get list of all tracks in given playlist.
+        Playlist may be specified by URL, id, name, or whatever specific to music provider
+        :param playlist_name: playlist identifier in any of music provider's appropriate form
+        :return: list of tracks, each track is same type as station_get_next_track
+        """
+        raise ExBpmCrawlGeneric(f"Internal error: Method {self.whoami()} is not implemented")
 
 
 class MusicProviderGoogle(MusicproviderBase):
@@ -254,6 +268,32 @@ class MusicProviderGoogle(MusicproviderBase):
                 file.write(chunk)
         file.flush()
         return file
+
+    def get_playlist_tracks(self, playlist_name):
+        if playlist_name.lower().startswith('http'):
+            # this is playlist url
+            error(f"playlist by URL is not implemented yet")
+            sys.exit(1)
+        else:
+            # this is playlist name
+            playlists = self.api.get_all_user_playlist_contents()
+            # find prevously created playlist with given name
+            playlist = None
+            for pl in playlists:
+                if pl["name"] == playlist_name:
+                    playlist = pl
+                    break
+            if not playlist:
+                return None
+            tracks_in_playlist = {}
+            tracks = []
+            if "tracks" in playlist:
+                for track in playlist["tracks"]:
+                    if "track" in track:  # it is play music's track
+                        if track["track"]["storeId"] not in tracks_in_playlist:
+                            tracks.append(track["track"])
+                            tracks_in_playlist[track["track"]["storeId"]] = True
+            return tracks
 
 
 music_service_mapping = {
