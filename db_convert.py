@@ -64,7 +64,7 @@ if __name__ == '__main__':
                     error(f"{whoami()}: internal error: len(old_cache)+1 ({len(old_cache)+1}) != len(new_cache) ({len(new_cache)})")
                     sys.exit(1)
                 info(f"migrated {len(new_cache)-1} records")
-        info(f"replacing file f{tracks_histogram_db} with new version, preserving old to {tracks_histogram_db+'.bak'}")
+        info(f"replacing file {tracks_histogram_db} with new version, preserving old to {tracks_histogram_db+'.bak'}")
         shutil.move(tracks_histogram_db, tracks_histogram_db+".bak")
         shutil.move(new_db, tracks_histogram_db)
     elif (db_version == "2") and (cache_db_version == "3"):
@@ -85,7 +85,7 @@ if __name__ == '__main__':
                     error(f"{whoami()}: internal error: len(old_cache)+1 ({len(old_cache)+1}) != len(new_cache) ({len(new_cache)})")
                     sys.exit(1)
                 info(f"migrated {len(new_cache)-1} records")
-        info(f"replacing file f{tracks_histogram_db} with new version, preserving old to {tracks_histogram_db+'.bak'}")
+        info(f"replacing file {tracks_histogram_db} with new version, preserving old to {tracks_histogram_db+'.bak'}")
         shutil.move(tracks_histogram_db, tracks_histogram_db+".bak")
         shutil.move(new_db, tracks_histogram_db)
     else:

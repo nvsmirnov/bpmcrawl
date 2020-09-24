@@ -58,10 +58,11 @@ def get_playlist_tracks_from_url(url):
         return tracks
 
 
-def get_cached_track(track_id):
+def get_cached_track(music_service, track_id):
     with SqliteDict(tracks_histogram_db, autocommit=True, encode=json.dumps, decode=json.loads) as cache:
         try:
-            cached = cache[track_id]
+            key = music_service + ":" + track_id
+            cached = cache[music_service + ":" + track_id]
         except KeyError:
             return None
         try:
@@ -71,25 +72,10 @@ def get_cached_track(track_id):
             sys.exit(1)
 
 
-def save_cached_track(track_id, histogram):
+def save_cached_track(music_service, track_id, histogram):
     """warning: for now, it will override all data saved for this track"""
     with SqliteDict(tracks_histogram_db, autocommit=True, encode=json.dumps, decode=json.loads) as cache:
-        cache[track_id] = {"histogram": histogram}
-
-
-def download_track(track_id):
-    """Returns tempfile object (it will be deleted upon close!)"""
-    file = tempfile.NamedTemporaryFile(mode='w+b', dir=temp_dir, prefix='track', suffix='.mp3')
-    stream_url = api.get_stream_url(track_id, quality='low')
-    with requests.get(stream_url, stream=True) as r:
-        r.raise_for_status()
-        for chunk in r.iter_content(chunk_size=8192):
-            # If you have chunk encoded response uncomment if
-            # and set chunk_size parameter to None.
-            # if chunk:
-            file.write(chunk)
-    file.flush()
-    return file
+        cache[music_service + ":" + track_id] = {"histogram": histogram}
 
 
 if __name__ == '__main__':
@@ -138,7 +124,7 @@ if __name__ == '__main__':
 
     if not playlist_name:
         station = api.get_station_from_url(station_url)
-        api.station_prepare()
+        api.station_prepare(station)
         info(f"Now crawling on station {api.get_station_name(station)}")
     else:
         ERRR_MODIFY_TO_MULTISERVICE
@@ -151,51 +137,17 @@ if __name__ == '__main__':
             break
         track_id = api.get_track_id(track)
         stats["processed"] += 1
-        histogram = ERRR_MODIFY_TO_MULTISERVICE get_cached_track(music_service, track_id)
+        histogram = get_cached_track(music_service, track_id)
         if not histogram:
             stats["new"] += 1
-            file = ERRR_MODIFY_TO_MULTISERVICE download_track(track_id)
+            file = api.download_track(track)
             debug(f"got track {track_id} to {file.name}")
             histogram = calc_bpm_histogram(file.name)
             file.close()
-            ERRR_MODIFY_TO_MULTISERVICE save_cached_track(music_service, track_id, histogram)
+            save_cached_track(music_service, track_id, histogram)
             info(f"saved histogram for track {track_id}: {histogram}")
         else:
             info(f"already have cached histogram for track {track_id}: {histogram}")
-
-    ERRR_MODIFY_TO_MULTISERVICE
-#### old code from here
-    tracks = ["first_stub"]
-    while len(tracks):
-        if station:
-            tracks = api.get_station_tracks(station['id'], num_tracks=25, recently_played_ids=tracks_cache)
-        else:
-            tracks = get_playlist_tracks_from_url(playlist_name)
-            info(f"Got {len(tracks)} track(s) from {playlist_name}")
-        found_new = False
-        for track in tracks:
-            track_id = track['storeId']
-            if track_id not in tracks_cache:
-                stats["processed"] += 1
-                histogram = get_cached_track(track_id)
-                if not histogram:
-                    found_new = True
-                    stats["new"] += 1
-                    file = download_track(track_id)
-                    debug(f"got track {track_id} to {file.name}")
-                    tracks_cache.append(track_id)
-                    histogram = calc_bpm_histogram(file.name)
-                    file.close()
-                    save_cached_track(track_id, histogram)
-                    info(f"saved histogram for track {track_id}: {histogram}")
-                else:
-                    info(f"already have cached histogram for track {track_id}: {histogram}")
-        if not station:
-            break
-        if not found_new:
-            debug(f"Probably we've seen all tracks now ({len(tracks_cache)}), exiting")
-            break
-        debug(f"seen {len(tracks_cache)} tracks up to time")
-        time.sleep(1)
-### old code
+        time.sleep(0.1)
     info(f"bpmcrawld exiting; stats: {stats}")
+

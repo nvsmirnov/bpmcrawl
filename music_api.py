@@ -1,5 +1,7 @@
 import logging
 import urllib
+import requests
+import tempfile
 
 from exceptions import *
 from config import *
@@ -88,12 +90,18 @@ class MusicproviderBase(WhoamiObject):
         :param station: station returned by get_station_from_url
         :return: None if there is no unseen tracks to play
         """
-
     def get_track_id(self, track):
         """
         Get track id for given track. Track id is used to save track info to cache databse.
         :param track: track returned by station_get_next_track, or track of playlist
         :return: String with track id
+        """
+    def download_track(self, track):
+        """
+        Download track to file and return Tempfile object.
+        File will be deleted upon close!
+        :param track: track returned by station_get_next_track, or track of playlist
+        :return: tempfile object with track data
         """
 
 
@@ -101,6 +109,7 @@ class MusicProviderGoogle(MusicproviderBase):
     music_service = 'gmusic'
     gmusic_client_id = gmusic_client_id
     api = None
+    station_current = None  # current station
     station_recently_played = None  # list of tracks already seen from current station
     station_current_tracks = None  # list of tracks got last time from station
     station_current_unseen = None  # count of tracks in current tracks list that were unseen in this playback session
@@ -175,8 +184,9 @@ class MusicProviderGoogle(MusicproviderBase):
         self.station_current_tracks = None
         self.station_current_unseen = 0
         self.station_now_playing = None
+        self.station_current = station
 
-    def station_get_next_track(self, station):
+    def station_get_next_track(self):
         need_new_tracks = False
         if self.station_current_tracks is None:
             need_new_tracks = True
@@ -204,11 +214,11 @@ class MusicProviderGoogle(MusicproviderBase):
                         return track
         # here we are only if we need more tracks from station
         debug(f"{self.whoami()}: getting new set of tracks")
-        self.station_current_tracks = self.api.get_station_tracks(station['id'], num_tracks=2,
+        self.station_current_tracks = self.api.get_station_tracks(self.station_current['id'], num_tracks=25,
                                                                   recently_played_ids=self.station_recently_played)
         self.station_current_unseen = 0
         self.station_now_playing = 0
-        if not self.station_current_tracks or len(self.station_current_tracks == 0):
+        if not self.station_current_tracks or len(self.station_current_tracks) == 0:
             debug(f"{self.whoami()}: got no tracks, stopping this playback cycle")
             return None
         debug(f"{self.whoami()}: got {len(self.station_current_tracks)} tracks")
@@ -231,6 +241,19 @@ class MusicProviderGoogle(MusicproviderBase):
 
     def get_track_id(self, track):
         return track['storeId']
+
+    def download_track(self, track):
+        file = tempfile.NamedTemporaryFile(mode='w+b', dir=temp_dir, prefix='track', suffix='.mp3')
+        stream_url = self.api.get_stream_url(self.get_track_id(track), quality='low')
+        with requests.get(stream_url, stream=True) as r:
+            r.raise_for_status()
+            for chunk in r.iter_content(chunk_size=8192):
+                # If you have chunk encoded response uncomment if
+                # and set chunk_size parameter to None.
+                # if chunk:
+                file.write(chunk)
+        file.flush()
+        return file
 
 
 music_service_mapping = {
