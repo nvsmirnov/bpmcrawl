@@ -73,10 +73,3 @@ print(tracks[0]['track']['id'])
 print(tracks[0]['track']['name'])
 # TODO: изучить https://github.com/plamere/spotipy/blob/master/examples/audio_analysis_for_track.py
 #       посмотреть на тему поиск по BPM
-# TODO: сделать spotify playlist change tracker - сохранять в кэш и фиксировать изменения в логе (м.б. такой же кэш)
-#       пока буду делать api, станет ясно как что меняется.
-#       hint: разница между списками (но тут надо не это):
-#           list(set([1, 2]).symmetric_difference(set([2, 3]))) == [1, 3]
-#       а чтобы понять, чем отличаются списки a=set([1,2]) и b=set([2,3]):
-#           list(a-b) == [1] # элемента 1 нет списке a, но есть в b (типа "добавленные треки")
-#           list(b-a) == [3] # элемента 3 нет списке b, но есть в a (типа "удалённые треки")
