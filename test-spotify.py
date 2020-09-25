@@ -71,6 +71,8 @@ for item in tracks:
 print("Playlist length: " + str(len(tracks)) + "\nExcluding: " + str(i))
 print(tracks[0]['track']['id'])
 print(tracks[0]['track']['name'])
+# TODO: изучить https://github.com/plamere/spotipy/blob/master/examples/audio_analysis_for_track.py
+#       посмотреть на тему поиск по BPM
 # TODO: сделать spotify playlist change tracker - сохранять в кэш и фиксировать изменения в логе (м.б. такой же кэш)
 #       пока буду делать api, станет ясно как что меняется.
 #       hint: разница между списками (но тут надо не это):
