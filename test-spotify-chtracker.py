@@ -55,7 +55,12 @@ def get_playlist_track_ids(playlist):
 if __name__ == '__main__':
     with SqliteDict(cache_path, autocommit=True, encode=json.dumps, decode=json.loads) as cache:
         for playlist in track_playlists:
-            print(f"Tracking playlist {playlist}")
+            playlist_name = None
+            try:
+                playlist_name = sp.playlist(playlist, fields=["name"])["name"]
+            except Exception as e:
+                print(f"failed to get playlist info for {playlist}, but proceeding anyway. The error was: {e}")
+            print(f"Tracking playlist {playlist} ({playlist_name})")
             try:
                 cached = cache[playlist]
             except KeyError:
