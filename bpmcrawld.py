@@ -8,6 +8,7 @@
 # TODO: implement mp3 download for spotify and fix MusicProviderSpotofy.calc_bpm_histogram
 # TODO: implement usage of spotipy's API named "recommendations".
 # TODO: implement supplementary DB, store there criterias which to use to find interested tracks (recommendations for genres, playlists to track, etc)
+# TODO: when logging "now crawling on playlist ..." - show not only id, but name
 
 import sys
 import os
