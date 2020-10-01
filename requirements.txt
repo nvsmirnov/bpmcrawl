@@ -3,3 +3,4 @@ gmusicapi
 sqlitedict
 requests
 pytaglib
+spotipy

@@ -5,6 +5,8 @@
 # If single parameter given - it will be treated as station URL
 # If -p playlist given, playlist will be treated as own playlist name or as shared playlist url (if begins with http...)
 #
+# TODO: implement mp3 download for spotify and fix MusicProviderSpotofy.calc_bpm_histogram
+# TODO: implement usage of spotipy's API named "recommendations".
 
 import sys
 import os
@@ -16,7 +18,6 @@ import json
 import argparse
 
 from music_api import *
-#from gmusicapi.clients import Mobileclient
 
 from sqlitedict import SqliteDict
 
@@ -26,7 +27,6 @@ from logging import debug, info, warning, error
 from exceptions import *
 from whoami import *
 from config import *
-from calc_bpm import *
 
 station_url = None
 playlist_name = None
@@ -95,14 +95,14 @@ if __name__ == '__main__':
 
     station = None
 
-    stats = {"processed": 0, "new": 0}
+    stats = {"processed": 0, "new": 0, "failed": 0}
 
     if not playlist_name:
         station = api.get_station_from_url(station_url)
         api.station_prepare(station)
         info(f"Now crawling on station {api.get_station_name(station)}")
     else:
-        playlist_tracks = api.get_playlist_tracks(playlist_name)
+        playlist_tracks = api.get_playlist_tracks(api.get_playlist(playlist_name))
         if playlist_tracks is None:
             info(f"Playlist not found: {playlist_name}")
             sys.exit(1)
@@ -126,13 +126,14 @@ if __name__ == '__main__':
         stats["processed"] += 1
         histogram = get_cached_track(music_service, track_id)
         if not histogram:
-            stats["new"] += 1
-            file = api.download_track(track)
-            debug(f"got track {track_id} to {file.name}")
-            histogram = calc_bpm_histogram(file.name)
-            file.close()
-            save_cached_track(music_service, track_id, histogram)
-            info(f"saved histogram for track {track_id}: {histogram}")
+            histogram = api.calc_bpm_histogram(track)
+            if histogram:
+                stats["new"] += 1
+                save_cached_track(music_service, track_id, histogram)
+                info(f"saved histogram for track {track_id}: {histogram}")
+            else:
+                stats["failed"] += 1
+                error(f"Failed to get histogram for {track_id}, skipping")
         else:
             info(f"already have cached histogram for track {track_id}: {histogram}")
         time.sleep(0.1)

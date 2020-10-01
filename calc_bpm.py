@@ -4,15 +4,15 @@
 from collections import OrderedDict
 
 from essentia import log
-log.infoActive=False
-log.warningActive=False
+log.infoActive = False
+log.warningActive = False
 from essentia.standard import *
 
 from logging import debug, info, warning, error
 
 from exceptions import *
 
-def calc_bpm_histogram(filename):
+def calc_file_bpm_histogram(filename):
     """Analyze filename, get average BPM and calculate DPB histogram
     :returns dict: { bpm(int): bpm_share(float) }
     :raises ExcBpmCrawlGeneric on error

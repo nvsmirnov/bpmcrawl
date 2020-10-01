@@ -96,7 +96,7 @@ if __name__ == '__main__':
                             help=f'Specify which music service provider to use')
         parser.add_argument('-p', '--playlist', default=playlist_name, type=str,
                             help=f'Playlist name to add tracks to, will be created if does not exists')
-        parser.add_argument('-b', '--bpm', default='176-184', type=str,
+        parser.add_argument('-b', '--bpm', default='172-180', type=str,
                             help=f'BPM range (with any of multipliers applied also)')
         parser.add_argument('-m', '--mult', default=[1, 0.5], nargs='+', type=float,
                             help=f'Multipliers to BPM range. I.e., if range is 176-180 and multipliers are [1, 0.5], then good BPM ranges are 176-184 and 88-92')
@@ -134,10 +134,12 @@ if __name__ == '__main__':
         api.login()
         debug("logged in")
 
-        playlist = api.get_or_create_playlist(playlist_name)
+        playlist = api.get_or_create_my_playlist(playlist_name)
         debug(f"found target playlist")
 
-        tracks_in_playlist = api.get_playlist_tracks(playlist)
+        tracks_in_playlist = []
+        for track in api.get_playlist_tracks(playlist):
+            tracks_in_playlist.append(api.get_track_id(track))
 
         stats = {"tracks_before": len(tracks_in_playlist), "tracks_added": 0, "failures": 0}
 
@@ -164,17 +166,21 @@ if __name__ == '__main__':
                             debug(f"track {track_id} is already in playlist (added this info to cache)")
                         else:
                             info(f"adding track {track_id} to playlist (avg={round(get_avg_bpm(good_bpms),2)}, {good_bpms})")
-                            if api.add_track_to_playlist(playlist["id"], track_id):
-                                if "in_playlists" not in cached:
-                                    cached["in_playlists"] = []
-                                if playlist["id"] not in cached["in_playlists"]:
-                                    cached["in_playlists"].append(playlist["id"])
-                                cache[track] = cached
-                                stats["tracks_added"] += 1
-                                info(f"added track {track_id} to playlist {playlist_name}")
-                            else:
+                            try:
+                                if api.add_track_to_playlist(playlist, track_id):
+                                    if "in_playlists" not in cached:
+                                        cached["in_playlists"] = []
+                                    if playlist["id"] not in cached["in_playlists"]:
+                                        cached["in_playlists"].append(playlist["id"])
+                                    cache[track] = cached
+                                    stats["tracks_added"] += 1
+                                    info(f"added track {track_id} to playlist {playlist_name}")
+                                else:
+                                    stats["failures"] += 1
+                                    error(f"failed to add track {track_id} to playlist (no reason given)")
+                            except ExBpmCrawlGeneric as e:
                                 stats["failures"] += 1
-                                error(f"failed to add track {id} to playlist (no reason given)")
+                                error(f"failed to add track {track_id}: {e}")
         info(f"bpmcrawl-pick exiting; stats: {stats}")
     except ExBpmCrawlGeneric as e:
         debug(f"Got exception:", exc_info=True)
