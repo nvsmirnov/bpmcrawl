@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 #
-# If run without parameters, it will crawl on I'm Feeling Locky station
+# If run without parameters, it will crawl on I'm Feeling Lucky station
 # If single parameter given - it will be treated as station URL
 # If -p playlist given, playlist will be treated as own playlist name or as shared playlist url (if begins with http...)
 #
