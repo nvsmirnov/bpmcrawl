@@ -66,6 +66,8 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--service', type=str,
                         required=True, choices=music_service_mapping.keys(),
                         help=f'Specify which music service provider to use')
+    parser.add_argument('-f', '--db-file', type=str,
+                        help=f'File to use instead of {tracks_histogram_db}')
     parser.add_argument('--station', type=str,
                         default='IFL',
                         help=f'For gmusic: station URL to analyze (special name IFL stands for "I feel lucky" station)')
@@ -95,6 +97,10 @@ if __name__ == '__main__':
     music_service = args.service
     station_url = args.station
     playlist_name = args.playlist
+
+    if args.db_file:
+        tracks_histogram_db = args.db_file
+    debug(f"using {tracks_histogram_db} as database")
 
     os.makedirs(temp_dir, exist_ok=True)
     os.makedirs(os.path.dirname(tracks_histogram_db), exist_ok=True)

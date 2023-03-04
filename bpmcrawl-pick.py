@@ -94,6 +94,8 @@ if __name__ == '__main__':
         parser.add_argument('-s', '--service', type=str,
                             required=True, choices=music_service_mapping.keys(),
                             help=f'Specify which music service provider to use')
+        parser.add_argument('-f', '--db-file', type=str,
+                            help=f'File to use instead of {tracks_histogram_db}')
         parser.add_argument('-p', '--playlist', default=playlist_name, type=str,
                             help=f'Playlist name to add tracks to, will be created if does not exists')
         parser.add_argument('-b', '--bpm', default='172-180', type=str,
@@ -115,6 +117,10 @@ if __name__ == '__main__':
 
         playlist_name = args.playlist
         music_service = args.service
+
+        if args.db_file:
+            tracks_histogram_db = args.db_file
+        debug(f"using {tracks_histogram_db} as database")
 
         m = re.match('^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$', args.bpm)
         if not m:
