@@ -135,6 +135,7 @@ if __name__ == '__main__':
         debug("logged in")
 
         playlist = api.get_or_create_my_playlist(playlist_name)
+        playlist_id = api.get_playlist_id(playlist)
         debug(f"found target playlist")
 
         tracks_in_playlist = []
@@ -153,15 +154,15 @@ if __name__ == '__main__':
                 cached = cache[track]
                 good_bpms = get_good_bpms(cached["histogram"], accept_bpm)
                 if good_bpms:
-                    if not args.reload and "in_playlists" in cached and playlist["id"] in cached["in_playlists"]:
+                    if not args.reload and "in_playlists" in cached and playlist_id in cached["in_playlists"]:
                         # cache says that we already added this track, and no -r option given
                         debug(f"track {track_id} was added to playlist earlier (got this from cache)")
                     else:
                         if track_id in tracks_in_playlist:
                             if "in_playlists" not in cached:
                                 cached["in_playlists"] = []
-                            if playlist["id"] not in cached["in_playlists"]:
-                                cached["in_playlists"].append(playlist["id"])
+                            if playlist_id not in cached["in_playlists"]:
+                                cached["in_playlists"].append(playlist_id)
                             cache[track] = cached
                             debug(f"track {track_id} is already in playlist (added this info to cache)")
                         else:
@@ -170,8 +171,8 @@ if __name__ == '__main__':
                                 if api.add_track_to_playlist(playlist, track_id):
                                     if "in_playlists" not in cached:
                                         cached["in_playlists"] = []
-                                    if playlist["id"] not in cached["in_playlists"]:
-                                        cached["in_playlists"].append(playlist["id"])
+                                    if playlist_id not in cached["in_playlists"]:
+                                        cached["in_playlists"].append(playlist_id)
                                     cache[track] = cached
                                     stats["tracks_added"] += 1
                                     info(f"added track {track_id} to playlist {playlist_name}")
@@ -181,6 +182,7 @@ if __name__ == '__main__':
                             except ExBpmCrawlGeneric as e:
                                 stats["failures"] += 1
                                 error(f"failed to add track {track_id}: {e}")
+                            break
         info(f"bpmcrawl-pick exiting; stats: {stats}")
     except ExBpmCrawlGeneric as e:
         debug(f"Got exception:", exc_info=True)

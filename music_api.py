@@ -1,4 +1,5 @@
 import logging
+import os
 import urllib
 import requests
 import tempfile
@@ -14,26 +15,33 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from spotipy.exceptions import *
 
+import yandex_music
+
 music_service_mapping = None  # it is really initialized at the end of this file
 
 
-def get_music_provider(music_service):
+def get_music_provider(music_service, provider_logging_level=logging.CRITICAL):
     if music_service not in music_service_mapping:
         raise ExBpmCrawlGeneric(f"Unknown music service provider: '{music_service}'")
-    return music_service_mapping[music_service](music_service)
+    return music_service_mapping[music_service](music_service, provider_logging_level)
 
 
 class MusicproviderBase(WhoamiObject):
     music_service = None
+    provider_logging_level = None
 
     def __str__(self):
         return self.__repr__()
     def __repr__(self):
         return f"{self.__class__.__name__}(music_service={self.music_service})"
 
-    def __init__(self, music_service):
+    def __init__(self, music_service, provider_logging_level=logging.CRITICAL):
         if self.music_service != music_service:
-            raise ExBpmCrawlGeneric(f"Internal error: tried to init {self.__class__.__name__} with wring service provider '{self.music_service}'")
+            raise ExBpmCrawlGeneric(f"Internal error: tried to init {self.__class__.__name__} with wrong service provider '{self.music_service}'")
+        self.set_provider_logging_level(provider_logging_level)
+
+    def set_provider_logging_level(self, provider_logging_level):
+        self.provider_logging_level = provider_logging_level
 
     def login(self):
         raise ExBpmCrawlGeneric(f"Internal error: Method {self.whoami()} is not implemented")
@@ -45,6 +53,14 @@ class MusicproviderBase(WhoamiObject):
         :return: playlist
         """
         raise ExBpmCrawlGeneric(f"Internal error: Method {self.whoami()} is not implemented")
+
+    def get_playlist_id(self, playlist):
+        """
+        Get id string of playlist
+        :param playlist: playlist object
+        :return: playlist id string
+        """
+        return playlist["id"]
 
     def get_or_create_my_playlist(self, playlist_name):
         """
@@ -318,6 +334,10 @@ class MusicProviderSpotify(MusicproviderBase):
     ]
     playlist_get_fields = ['id', 'name', 'uri']
 
+    def set_provider_logging_level(self, provider_logging_level):
+        super(MusicproviderYandexMusic, self).set_provider_logging_level(provider_logging_level)
+        logging.getLogger("spotipy").setLevel(self.provider_logging_level)
+
     def login(self):
         logging.getLogger("spotipy").setLevel(logging.CRITICAL)
         try:
@@ -442,7 +462,172 @@ class MusicProviderSpotify(MusicproviderBase):
         return histogram
 
 
+class MusicproviderYandexMusic(MusicproviderBase):
+
+    class YMPlaylistLiked(WhoamiObject):
+        client = None
+        tracks = None
+
+        def __init__(self, client):
+            self.client = client
+            track_ids = [x.id for x in self.client.users_likes_tracks()]
+            self.tracks = self.client.tracks(track_ids)
+
+    music_service = 'yandexmusic'
+    token_env_var = 'YM_TOKEN'
+    token = None
+    client = None
+
+    def __init__(self, music_service, provider_logging_level=logging.CRITICAL):
+
+        super(MusicproviderYandexMusic, self).__init__(music_service, provider_logging_level)
+        if not self.token:
+            self.token = os.environ.get(self.token_env_var, None)
+        if not self.token:
+            raise ExBpmCrawlGeneric(
+                f"You need to set {self.token_env_var} environment variable.\n"
+                f"To obtain token, visit this page:\n"
+                f"https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d\n"
+                f"(the client_id here is the IS of official YM client)\n"
+                f"Then, after you authenticate, copy token to YM_TOKEN env variable.\n"
+                f"More on this: https://yandex.ru/dev/direct/doc/start/token.html (getting token manually)"
+            )
+
+    def set_provider_logging_level(self, provider_logging_level):
+        super(MusicproviderYandexMusic, self).set_provider_logging_level(provider_logging_level)
+        logging.getLogger("yandex_music").setLevel(self.provider_logging_level)
+
+    def login(self):
+        try:
+            self.client = yandex_music.Client(self.token).init()
+        except yandex_music.exceptions.UnauthorizedError as e:
+            raise ExBpmCrawlGeneric(
+                f"Failed to log in to {self.music_service}: {e}\n"
+                f"You may try to obtain another token.\n"
+                f"For instructions, run the app with no {self.token_env_var} env set."
+            )
+        if not self.client.me.account.login:
+            raise ExBpmCrawlGeneric(
+                f"Internal error: it looks like login to {self.music_service} was performed as anonymous user."
+            )
+
+    def get_playlist(self, playlist_id_uri_name):
+        """
+        Get existing playlist by name (or id or uri if supported by specific provider's child class)
+        :param playlist_id_uri_name: playlist id, uri or name
+        :return: playlist
+        """
+        if playlist_id_uri_name == 'LIKED':  # special name: liked tracks
+            return self.YMPlaylistLiked(self.client)
+        elif playlist_id_uri_name == 'PLOD':  # special name: playlist of the day
+            pers_blocks = self.client.landing(blocks=['personalplaylists']).blocks[0]
+            playlist = next(
+                x.data.data for x in pers_blocks.entities if x.data.data.generated_playlist_type == 'playlistOfTheDay'
+            )
+            return playlist
+        else:
+            user_playlists = self.client.users_playlists_list()
+            playlist = next((p for p in user_playlists if p.title == playlist_id_uri_name), None)
+            if playlist == None:
+                raise ExBpmCrawlPlaylistNotExists(f'playlist "{playlist_id_uri_name}" not found')
+            return playlist
+        raise ExBpmCrawlGeneric(f"Internal error in {self.whoami()}: should not be here")
+
+    def get_playlist_id(self, playlist):
+        return playlist.kind
+
+    def get_or_create_my_playlist(self, playlist_name):
+        """
+        Get existing playlist, or create user's playlist if it does not exist.
+        :param playlist_name: Name of playlist (or, if supported by specific provider's API, uri or id of it)
+        :return: playlist
+        """
+        try:
+            playlist = self.get_playlist(playlist_name)
+        except ExBpmCrawlPlaylistNotExists:
+            playlist = self.client.users_playlists_create(playlist_name)
+        return playlist
+
+    def get_playlist_tracks(self, playlist):
+        """
+        Get all tracks of playlist
+        :param playlist: playlist returned by get_or_create_my_playlist()
+        :return: list of tracks
+        """
+        tracks = playlist.tracks if playlist.tracks else playlist.fetch_tracks()
+        if len(tracks):
+            if isinstance(tracks[0], yandex_music.TrackShort):
+                # then, probably if we'll do fetch_tracks, they'll become Track objects, not TrackShort
+                track_ids = [x.id for x in tracks]
+                tracks = self.client.tracks(track_ids)
+        return tracks
+
+    def add_track_to_playlist(self, playlist, track_id):
+        """
+        Add track to existing playlist
+        :param playlist: playlist returned by get_or_create_playlist()
+        :param track_id: track id to add (not track object but track id)
+        :return: True if added, false if not
+        """
+        tracks = self.client.tracks([track_id])
+        if not tracks or not len(tracks):
+            raise ExBpmCrawlGeneric(f"Failed to find track with id '{track_id}'")
+        if len(tracks) != 1:
+            raise ExBpmCrawlGeneric(f"Ambiguous track found for id '{track_id}': got {len(tracks)} tracks instead of 1")
+        try:
+            album_id = tracks[0].albums[0].id
+        except Exception as e:
+            raise ExBpmCrawlGeneric(f"Failed to get album id for track {track_id} ({track.title})")
+        if playlist.insert_track(track_id, album_id):
+            return True
+        else:
+            return False
+
+    def get_track_id(self, track):
+        """
+        Get track id for given track. Track id is used to save track info to cache databse.
+        :param track: track returned by station_get_next_track, or track of playlist
+        :return: String with track id
+        """
+        return f"{track.id}"
+
+    def download_track(self, track):
+        """
+        Download track to file and return Tempfile object.
+        File will be deleted upon close!
+        :param track: track returned by station_get_next_track, or track of playlist
+        :return: tempfile object with track data
+        """
+        file = tempfile.NamedTemporaryFile(mode='w+b', dir=temp_dir, prefix='track', suffix='.mp3')
+        try:
+            try:
+                track.download(file.name)
+            except AttributeError:
+                debug(f"{self.whoami()}: warning: probably got TrackShort object (normally I need to get a list of full track objects! say to author!), trying to get full Track object.")
+                track = track.fetchTrack()
+                track.download(file.name)
+        except yandex_music.exceptions.UnauthorizedError:
+            info(f"Yandex prohibited track download of '{track.title}'")
+            return None
+        return file
+
+    def calc_bpm_histogram(self, track):
+        """
+        Calculate BPM histogram for track
+        :param track: track returned by station_get_next_track, or track of playlist
+        :return: histogram: { bpm1(float): bpm1_share, bpm2(float): bpm2_share }
+        """
+        file = self.download_track(track)
+        if not file:
+            return None
+        debug(f"{self.whoami()}: got track {self.get_track_id(track)} to {file.name}")
+        histogram = calc_file_bpm_histogram(file.name)
+        file.close()
+        return histogram
+
+
 music_service_mapping = {
     'gmusic': MusicProviderGoogle,
     'spotify': MusicProviderSpotify,
+    'yandexmusic': MusicproviderYandexMusic,
 }

@@ -5,7 +5,7 @@
 # If single parameter given - it will be treated as station URL
 # If -p playlist given, playlist will be treated as own playlist name or as shared playlist url (if begins with http...)
 #
-# TODO: implement mp3 download for spotify and fix MusicProviderSpotofy.calc_bpm_histogram
+# TODO: implement mp3 download for spotify and fix MusicProviderSpotify.calc_bpm_histogram
 # TODO: implement usage of spotipy's API named "recommendations".
 # TODO: implement supplementary DB, store there criterias which to use to find interested tracks (recommendations for genres, playlists to track, etc)
 # TODO: when logging "now crawling on playlist ..." - show not only id, but name
@@ -73,12 +73,18 @@ if __name__ == '__main__':
                         help=f'Playlist name or URL. If specified, will override --station')
     parser.add_argument('-d', '--debug', default=False, action='store_true',
                         help=f'Enable debugging output')
+    parser.add_argument('-D', '--provider-debug', default=False, action='store_true',
+                        help=f'Enable debugging output for music provider library')
 
     args = parser.parse_args()
 
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
         debug("enabled debug")
+
+    provider_logging_level = logging.CRITICAL
+    if args.provider_debug:
+        provider_logging_level = logging.DEBUG
 
     music_service = args.service
     station_url = args.station
@@ -91,9 +97,8 @@ if __name__ == '__main__':
         print(f"wrong cache version, convert or delete it ({tracks_histogram_db})", file=sys.stderr)
         sys.exit(1)
 
-    api = get_music_provider(music_service)
+    api = get_music_provider(music_service, provider_logging_level)
     api.login()
-    debug("logged in")
 
     station = None
 

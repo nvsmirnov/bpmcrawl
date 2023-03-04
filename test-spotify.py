@@ -5,7 +5,6 @@ from music_api import *
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
-logging.getLogger("spotipy").setLevel(logging.CRITICAL)
 logging.getLogger("urllib3").setLevel(logging.ERROR)
 logging.getLogger("sqlitedict").setLevel(logging.ERROR)
 
