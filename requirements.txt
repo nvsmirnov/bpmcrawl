@@ -2,6 +2,6 @@ essentia==2.1b6.dev234
 gmusicapi==13.0.0
 sqlitedict==1.6.0
 requests==2.24.0
-pytaglib==1.4.6
+#pytaglib==1.4.6
 spotipy==2.16.0
 yandex-music==2.0.1

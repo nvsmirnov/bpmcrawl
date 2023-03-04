@@ -71,6 +71,12 @@ if __name__ == '__main__':
                         help=f'For gmusic: station URL to analyze (special name IFL stands for "I feel lucky" station)')
     parser.add_argument('-p', '--playlist', type=str,
                         help=f'Playlist name or URL. If specified, will override --station')
+    parser.add_argument('-a', '--artist', type=str,
+                        help=f'Artist name. If will not find exact artist, will list them')
+    parser.add_argument('-A', '--artist-id', type=str,
+                        help=f'Artist id.')
+    parser.add_argument('-l', '--limit', default=0, type=int,
+                        help=f'Process no more than this amount of tracks (useful for testing), 0 for no limit.')
     parser.add_argument('-d', '--debug', default=False, action='store_true',
                         help=f'Enable debugging output')
     parser.add_argument('-D', '--provider-debug', default=False, action='store_true',
@@ -104,28 +110,47 @@ if __name__ == '__main__':
 
     stats = {"processed": 0, "new": 0, "failed": 0}
 
-    if not playlist_name:
-        station = api.get_station_from_url(station_url)
-        api.station_prepare(station)
-        info(f"Now crawling on station {api.get_station_name(station)}")
-    else:
+    mode = None
+    if playlist_name:
+        mode = 'playlist'
         playlist_tracks = api.get_playlist_tracks(api.get_playlist(playlist_name))
         if playlist_tracks is None:
             info(f"Playlist not found: {playlist_name}")
             sys.exit(1)
         playlist_current_track = 0
         info(f"Now crawling on playlist {playlist_name} ({len(playlist_tracks)} tracks)")
+    elif args.artist or args.artist_id:
+        mode = 'artist'
+        artist_id = None
+        if args.artist_id:
+            artist_id = args.artist_id
+        elif args.artist:
+            raise ExBpmCrawlGeneric(f"artist by name is not implemented yet")
+        artist = api.get_artist(artist_id)
+        if not artist:
+            raise ExBpmCrawlGeneric(f"Failed to find artist with id {artist_id}")
+        api.artist_pager_init(artist)
+    else:
+        mode = 'stations'
+        # this is what was for google music, there were "stations"
+        station = api.get_station_from_url(station_url)
+        api.station_prepare(station)
+        info(f"Now crawling on station {api.get_station_name(station)}")
 
     stop = False
     while not stop:
-        if not playlist_name:
+        if mode == 'stations':
             track = api.station_get_next_track()
-        else:
+        elif mode == 'playlist':
             if playlist_current_track < len(playlist_tracks):
                 track = playlist_tracks[playlist_current_track]
                 playlist_current_track += 1
             else:
                 track = None
+        elif mode == 'artist':
+            track = api.artist_pager_get_next_track(artist)
+        else:
+            raise ExBpmCrawlGeneric(f"Internal error: unknown mode :'{mode}'")
         if not track:
             stop = True
             break
@@ -143,6 +168,9 @@ if __name__ == '__main__':
                 error(f"Failed to get histogram for {track_id}, skipping")
         else:
             info(f"already have cached histogram for track {track_id}: {histogram}")
+        if stats["processed"] >= args.limit:
+            info(f"Reached limit of {args.limit} tracks, stopping.")
+            stop = True
         time.sleep(0.1)
     info(f"bpmcrawld exiting; stats: {stats}")
 

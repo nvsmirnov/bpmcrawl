@@ -146,6 +146,39 @@ class MusicproviderBase(WhoamiObject):
         """
         raise ExBpmCrawlGeneric(f"Internal error: Method {self.whoami()} is not implemented")
 
+    def get_artist(self, artist_id):
+        """
+        Get artist object for given artist id
+        :param artist_id: artist id
+        :return: artist object
+        """
+        raise ExBpmCrawlGeneric(f"Internal error: Method {self.whoami()} is not implemented")
+
+    def artist_pager_init(self, artist):
+        """
+        Init tracks pager for artist
+        :param artist: artist object
+        :return: Nothing
+        """
+        raise ExBpmCrawlGeneric(f"Internal error: Method {self.whoami()} is not implemented")
+
+    def artist_pager_load_page(self, artist, page_num=0):
+        """
+        Get page of tracks for artist
+        :param artist: artist object
+        :param page_num: page number (default 0)
+        :return: Nothing
+        """
+        raise ExBpmCrawlGeneric(f"Internal error: Method {self.whoami()} is not implemented")
+
+    def artist_pager_get_next_track(self, artist):
+        """
+        Get next track for previously initialized pager for artist.
+        :param artist: artist object
+        :return: Track object or None if end of list reached
+        """
+        raise ExBpmCrawlGeneric(f"Internal error: Method {self.whoami()} is not implemented")
+
 
 class MusicProviderGoogle(MusicproviderBase):
     music_service = 'gmusic'
@@ -461,6 +494,9 @@ class MusicProviderSpotify(MusicproviderBase):
         debug(f"{self.whoami()}: histogram({track_id}): {histogram}")
         return histogram
 
+    def artist_pager_init(self, artist):
+        self.artist_pager_load(artist, 0)
+
 
 class MusicproviderYandexMusic(MusicproviderBase):
 
@@ -477,6 +513,7 @@ class MusicproviderYandexMusic(MusicproviderBase):
     token_env_var = 'YM_TOKEN'
     token = None
     client = None
+    artist_pager = {}
 
     def __init__(self, music_service, provider_logging_level=logging.CRITICAL):
 
@@ -624,6 +661,32 @@ class MusicproviderYandexMusic(MusicproviderBase):
         histogram = calc_file_bpm_histogram(file.name)
         file.close()
         return histogram
+
+    def get_artist(self, artist_id):
+        artists = self.client.artists(artist_id)
+        if not artists or not len(artists):
+            raise ExBpmCrawlGeneric(f"Artist not found for id {artist_id}")
+        return artists[0]
+
+    def artist_pager_init(self, artist):
+        self.artist_pager_load_page(artist, 0)
+
+    def artist_pager_load_page(self, artist, page_num=0):
+        debug(f"loading artist {artist.id}'s tracks page {page_num}")
+        self.artist_pager[artist.id] = {'page': page_num, 'idx': 0, 'tracks': []}
+        self.artist_pager[artist.id]['tracks'] = artist.get_tracks(self.artist_pager[artist.id]['page'], 50)
+
+    def artist_pager_get_next_track(self, artist):
+        try:
+            track = self.artist_pager[artist.id]['tracks'][self.artist_pager[artist.id]['idx']]
+            self.artist_pager[artist.id]['idx'] += 1
+            return track
+        except IndexError:
+            if self.artist_pager[artist.id]['idx'] == 0:
+                return None
+            else:
+                self.artist_pager_load_page(artist, self.artist_pager[artist.id]['page']+1)
+                return self.artist_pager_get_next_track(artist)
 
 
 music_service_mapping = {

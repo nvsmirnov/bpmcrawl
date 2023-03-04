@@ -71,6 +71,21 @@ if False:
         quit()
 
 # track info by id
-if True:
+if False:
     tracks = api.client.tracks(['10441924'])
     pp.pprint(ast.literal_eval(f"{tracks[0].albums[0].id}"))
+
+# tracks by artist
+if True:
+    artist = api.client.artists(['41075'])[0]
+    pp.pprint(ast.literal_eval(f"{artist}"))
+    print(f"artist {artist.id}: {artist.name}")
+    api.artist_pager_init(artist)
+    for n in range(0,4):
+        track = api.artist_pager_get_next_track(artist)
+        if not track:
+            break
+        album_id = track.albums[0].id
+        #pp.pprint(ast.literal_eval(f"{track}"))
+        print(f"Id: {track.id}, Title: {track.title}, duration: {int(track.duration_ms / 1000)}s, album_id: {album_id}")
+
