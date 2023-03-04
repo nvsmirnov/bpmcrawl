@@ -182,7 +182,6 @@ if __name__ == '__main__':
                             except ExBpmCrawlGeneric as e:
                                 stats["failures"] += 1
                                 error(f"failed to add track {track_id}: {e}")
-                            break
         info(f"bpmcrawl-pick exiting; stats: {stats}")
     except ExBpmCrawlGeneric as e:
         debug(f"Got exception:", exc_info=True)
