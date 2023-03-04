@@ -168,9 +168,10 @@ if __name__ == '__main__':
                 error(f"Failed to get histogram for {track_id}, skipping")
         else:
             info(f"already have cached histogram for track {track_id}: {histogram}")
-        if stats["processed"] >= args.limit:
-            info(f"Reached limit of {args.limit} tracks, stopping.")
-            stop = True
+        if args.limit:
+            if stats["processed"] >= args.limit:
+                info(f"Reached limit of {args.limit} tracks, stopping.")
+                stop = True
         time.sleep(0.1)
     info(f"bpmcrawld exiting; stats: {stats}")
 
