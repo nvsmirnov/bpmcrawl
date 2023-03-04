@@ -523,11 +523,10 @@ class MusicproviderYandexMusic(MusicproviderBase):
         if not self.token:
             raise ExBpmCrawlGeneric(
                 f"You need to set {self.token_env_var} environment variable.\n"
-                f"To obtain token, visit this page:\n"
-                f"https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d\n"
-                f"(the client_id here is the IS of official YM client)\n"
-                f"Then, after you authenticate, copy token to YM_TOKEN env variable.\n"
-                f"More on this: https://yandex.ru/dev/direct/doc/start/token.html (getting token manually)"
+                f"To obtain token (use python3, and venv if you need):\n"
+                f"pip install selenium\n"
+                f"python3 yandex-get-token.py\n"
+                f"(browser will start, and then after all manipulations token will be printed to stdout)"
             )
 
     def set_provider_logging_level(self, provider_logging_level):
