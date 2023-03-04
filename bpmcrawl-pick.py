@@ -134,6 +134,7 @@ if __name__ == '__main__':
         api.login()
         debug("logged in")
 
+        # this code repeats in other place, too
         playlist = api.get_or_create_my_playlist(playlist_name)
         playlist_id = api.get_playlist_id(playlist)
         debug(f"found target playlist")
@@ -175,7 +176,9 @@ if __name__ == '__main__':
                                         cached["in_playlists"].append(playlist_id)
                                     cache[track] = cached
                                     stats["tracks_added"] += 1
-                                    info(f"added track {track_id} to playlist {playlist_name}")
+                                    info(f"added track {track_id} to playlist {playlist_name}, loading updated playlist")
+                                    playlist = api.get_or_create_my_playlist(playlist_name)
+                                    playlist_id = api.get_playlist_id(playlist)
                                 else:
                                     stats["failures"] += 1
                                     error(f"failed to add track {track_id} to playlist (no reason given)")
