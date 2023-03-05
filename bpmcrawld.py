@@ -164,7 +164,10 @@ if __name__ == '__main__':
         stats["processed"] += 1
         histogram = get_cached_track(music_service, track_id)
         if not histogram:
-            histogram = api.calc_bpm_histogram(track)
+            try:
+                histogram = api.calc_bpm_histogram(track)
+            except ExBpmCrawlGeneric as e:
+                error(f"Got error instead of histogram: ${e}")
             if histogram:
                 stats["new"] += 1
                 save_cached_track(music_service, track_id, histogram)
