@@ -27,7 +27,7 @@ def calc_file_bpm_histogram(filename):
         rhythm_extractor = RhythmExtractor2013(method="multifeature")
         (bpm, beats, beats_confidence, _, beats_intervals) = rhythm_extractor(audio)
     except Exception as e:
-        raise ExcBpmCrawlGeneric(str(e))
+        raise ExBpmCrawlGeneric(str(e))
         #if re.search('Could not find stream information', str(e)):
         #    raise ExcBpmCrawlGeneric(str(e))
         #else:
