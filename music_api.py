@@ -1,4 +1,3 @@
-# TODO: похоже, надо пытаться обновить playlist of the day в YM, как это в примерах показано
 import logging
 import os
 import urllib
