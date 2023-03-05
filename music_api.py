@@ -525,7 +525,7 @@ class MusicproviderYandexMusic(MusicproviderBase):
             raise ExBpmCrawlGeneric(
                 f"You need to set {self.token_env_var} environment variable.\n"
                 f"To obtain token (use python3, and venv if you need):\n"
-                f"pip install selenium\n"
+                f"pip install selenium webdriver_manager\n"
                 f"python3 yandex-get-token.py\n"
                 f"(browser will start, and then after all manipulations token will be printed to stdout)"
             )
