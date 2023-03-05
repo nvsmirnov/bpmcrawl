@@ -5,6 +5,7 @@ import urllib
 import requests
 import tempfile
 import time
+import datetime
 
 from exceptions import *
 from config import *
@@ -561,7 +562,27 @@ class MusicproviderYandexMusic(MusicproviderBase):
             playlist = next(
                 x.data.data for x in pers_blocks.entities if x.data.data.generated_playlist_type == 'playlistOfTheDay'
             )
-            return playlist
+            # the "update" code is from example "paily_playlist_updater.py" but modified
+            if playlist.modified:
+                pl_modified = datetime.datetime.strptime(playlist.modified, "%Y-%m-%dT%H:%M:%S%z").date()
+                if datetime.datetime.now().date() == pl_modified:
+                    debug(f"playlist {playlist_id_uri_name} is updated today, {pl_modified}")
+                    return playlist
+                else:
+                    debug(f"playlist {playlist_id_uri_name} is updated at {pl_modified}, will try to update")
+            debug(f"trying to update playlist {playlist_id_uri_name}")
+            updated_playlist = self.client.users_playlists(user_id=playlist.uid, kind=playlist.kind)
+            if updated_playlist.modified:
+                pl_modified = datetime.datetime.strptime(updated_playlist.modified, "%Y-%m-%dT%H:%M:%S%z").date()
+                debug(f"tried to update playlist {playlist_id_uri_name}, update date now is {pl_modified}")
+                return updated_playlist
+            else:
+                debug(f"tried to update playlist {playlist_id_uri_name} but failed")
+                print(f"playlist before update: modified: %s, play_counter: %s" % (
+                    playlist.modified, playlist.play_counter))
+                print(f"playlist after  update: modified: %s, play_counter: %s" % (
+                    updated_playlist.modified, updated_playlist.play_counter))
+            return updated_playlist
         else:
             user_playlists = self.client.users_playlists_list()
             playlist = next((p for p in user_playlists if p.title == playlist_id_uri_name), None)
