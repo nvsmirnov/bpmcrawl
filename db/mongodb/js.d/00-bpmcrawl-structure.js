@@ -46,7 +46,7 @@ db.histograms.insertMany([
         // it is ok to have sample track record in real database
         "track_uri": "sampleservice/sample_track_id", // track_uri is "our" unique track id consisting of service name and service's track id
         "service": "sampleservice",
-        "service_track_id": "sample_track_id", // track id in the service
+        "track_id": "sample_track_id", // track id in the service
         "histogram": { 90: 0.9, 181: 0.1, },
         "from_playlists": {
             "sampleservice/sample@sample.nonexistent/sample_playlist_id": 1, // playlist ids are service-specific - service_playlist_id
@@ -82,20 +82,25 @@ db.targets.insertMany([
     },
 ]);
 
-db.jobs.createIndexes([{"job_id":1, "locked":1}], {"unique": true});
+db.jobs.createIndexes([{"job_uri":1, "job_id":1, "locked":1}], {"unique": true});
 // the logic of job pick-up:
 // the process who wants to puck up job to work on it, must first update job's document
-// and set "locked" field to value of "job_id" field.
-// there is unique constraint on "locked" field, so only first attempt will be successful
-// who updated field successfully, may and must proceed to work on job
-// who got exception on unique constraint - should go for another job
+// and set:
+//   "locked" field to value of "job_id" field.
+//   "worker_id" to this worker's instance unique id (generated uuid)
+//   there is unique constraint on "locked" field, so only first attempt will be successful
+//   the process which updated field successfully, may and must proceed to work on job
+//   those who will get exception on unique constraint - should go for another job
 db.jobs.insertMany([
     {
-        "job_id": "sample_job_1", // better when name will be made of all job's parameters combined, it will prevent same job creation
-        "locked": "",
+        "job_id": "some_uuid",
+        "job_uri": "sample_job_1", // better when name will be made of all job's parameters combined, it will prevent same job creation
+        "locked": null,
+        "worker_id": "",
         "finished": false,
         "time_took": 0, // seconds - set after job finish
-        "timestamp_updated": "", // для длительных заданий периодически ставить timestamp, UTC unixtime
+        "timestamp_started": 0, // UTC unixtime when job was started
+        "timestamp_updated": 0, // UTC unixtime when job was updated by worker (sign of 'still working'), inactive jobs will be purged
         "user":  "sample@sample.nonexistent",
         "service": "sampleservice",
         // job_kind:
