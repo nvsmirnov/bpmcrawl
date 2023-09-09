@@ -1,4 +1,4 @@
-Поиск треков под подходящий BPM.
+# Поиск треков под подходящий BPM.
 
 Работает на python 3.7+
 
@@ -7,7 +7,7 @@ python -m venv venv
 
 pip install -r requirements.txt
 
-Для Google Music: сперва надо запустить gmusic-login и следовать указаниям.
+## Для Google Music: сперва надо запустить gmusic-login и следовать указаниям.
 
 ./bpmcrawld.py -s gmusic [--station URL | -p playlist_name]
 Будет извлекать (путём расчёта) из всех треков информацию о BPM и сохранять в histogram.db
@@ -22,3 +22,15 @@ pip install -r requirements.txt
 Если при использовании Google Music вдруг начала появляться ругань в духе Access Denied или вроде того, можно попробовать перелогиниться в Google Music.
 Для этого надо удалить файл ~/.local/share/gmusicapi/mobileclient.cred и запустить ./gmusic-login.py
 
+## Yandex Music
+
+API закрытый. Штатного способа получения токена нет.
+Но есть хакерский :-)
+
+- Сложить yandex-get-token.py в отдельный каталог.
+- python3 -m venv venv
+- . venv/bin/activate
+- pip install selenium
+- python yandex-get-token.py
+
+В итоге должен запуститься браузер, и по завершении всех манипуляций скрипт должен написать на stdout требуемый токен.
