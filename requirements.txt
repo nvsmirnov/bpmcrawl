@@ -1,4 +1,4 @@
-essentia==2.1b6.dev234
+essentia==2.1b6.dev1034
 gmusicapi==13.0.0
 sqlitedict==1.6.0
 requests==2.24.0
