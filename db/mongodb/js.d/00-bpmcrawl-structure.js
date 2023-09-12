@@ -39,7 +39,7 @@ db.playlists.insertMany([
     },
 ]);
 
-db.histograms.createIndexes([{"track_uri":1}], {"unique":true});
+db.histograms.createIndex({"track_uri":1}, {"unique":true});
 db.histograms.createIndexes([{"service":1}, {"service_track_id":1}], {"unique":false});
 db.histograms.insertMany([
     {
@@ -56,13 +56,14 @@ db.histograms.insertMany([
     },
 ]);
 
-db.targets.createIndexes([{"target_uri":1}], {"unique": true});
+db.targets.createIndex({"target_uri":1}, {"unique": true});
+db.targets.createIndexes([{"user":1},{"service":1},{"target":1}], {"unique": true});
 db.targets.insertMany([
     {
         "user": "sample@sample.nonexistent",
         "service": "sampleservice",
         "target": "bpmcrawl.180",
-        "target_uri": "sample@sample.nonexistent/sampleservice/ym.bpmcrawl.180.ng", // just for uniqueness
+        "target_uri": "sample@sample.nonexistent/sampleservice/bpmcrawl.180", // just for uniqueness
         "bpms": { "min": 176, "max": 182 },
         "sources": {
             "playlists": {
@@ -82,27 +83,30 @@ db.targets.insertMany([
     },
 ]);
 
-db.jobs.createIndexes([{"job_uri":1, "job_id":1, "locked":1}], {"unique": true});
+db.jobs.createIndex({"job_uri":1}, {"unique": true});
+db.jobs.createIndex({"job_id":1}, {"unique": true});
+db.jobs.createIndex({"locked":1}, {"unique": true});
 // the logic of job pick-up:
-// the process who wants to puck up job to work on it, must first update job's document
+// the process who wants to pick up job to work on it, must first update job's document
 // and set:
-//   "locked" field to value of "job_id" field.
+// TODO: да не работает такая логика! ищи другую...
+// наверное так: сперва update set worker_id = my_id.
+// потом считать этот job_id, и проверить, что worker_id == my_id. У кого совпало тот и работает.
+//   "locked" field to value of f"{job_id}-locked".
 //   "worker_id" to this worker's instance unique id (generated uuid)
 //   there is unique constraint on "locked" field, so only first attempt will be successful
 //   the process which updated field successfully, may and must proceed to work on job
 //   those who will get exception on unique constraint - should go for another job
 db.jobs.insertMany([
     {
-        "job_id": "some_uuid",
+        "job_id": "job-uuid",
         "job_uri": "sample_job_1", // better when name will be made of all job's parameters combined, it will prevent same job creation
-        "locked": null,
-        "worker_id": "",
+        "worker_id": null,
+        "started": false,
         "finished": false,
-        "time_took": 0, // seconds - set after job finish
-        "timestamp_started": 0, // UTC unixtime when job was started
-        "timestamp_updated": 0, // UTC unixtime when job was updated by worker (sign of 'still working'), inactive jobs will be purged
-        "user":  "sample@sample.nonexistent",
-        "service": "sampleservice",
+        "time_took": null, // seconds - set after job finish
+        "timestamp_started": null, // UTC unixtime when job was started
+        "timestamp_updated": null, // UTC unixtime when job was updated by worker (sign of 'still working'), inactive jobs will be purged
         // job_kind:
         //   scan_playlist:
         //     scan playlist, find tracks without calculated histograms,
@@ -112,6 +116,11 @@ db.jobs.insertMany([
         //   pick_tracks:
         //     per-user, per-target job: pick jobs from histograms db that are still not in target
         //     and put them to target playlist
-        "job_kind": "",
+        "kind": "",
+        "def": {
+            "user":  "sample@sample.nonexistent",
+            "service": "sampleservice",
+            // ... other job fields
+        },
     },
 ]);

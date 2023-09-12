@@ -1,7 +1,22 @@
-__all__ = ['ExBpmcrawlGeneric', 'ExBpmcrawlPlaylistNotExists']
+__all__ = [
+    'ExBpmcrawlGeneric',
+    'ExBpmcrawlPlaylistNotExists',
+    'ExBpmcrawlJobPickupFailed',
+    'ExBpmcrawlJobAlreadyExist',
+]
+
 
 class ExBpmcrawlGeneric(Exception):
     pass
 
-class ExBpmcrawlPlaylistNotExists(ExBpmCrawlGeneric):
+
+class ExBpmcrawlPlaylistNotExists(ExBpmcrawlGeneric):
+    pass
+
+
+class ExBpmcrawlJobPickupFailed(ExBpmcrawlGeneric):
+    pass
+
+
+class ExBpmcrawlJobAlreadyExist(ExBpmcrawlGeneric):
     pass

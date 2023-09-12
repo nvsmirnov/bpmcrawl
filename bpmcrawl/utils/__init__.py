@@ -1,4 +1,4 @@
-from whoami import *
+from .whoami import *
 
 __all__ = ['whoami', 'WhoamiObject']
 
