@@ -4,15 +4,34 @@ from backend.log import *
 from backend.whoami import *
 
 
-def get_music_provider(music_service, provider_logging_level=CRITICAL):
-    if music_service not in music_service_mapping:
-        raise ExBpmcrawlGeneric(f"Unknown music service provider: '{music_service}'")
-    return music_service_mapping[music_service](music_service, provider_logging_level)
+#def get_music_provider(music_service, provider_logging_level=CRITICAL):
+#    if music_service not in music_service_mapping:
+#        raise ExBpmcrawlGeneric(f"Unknown music service provider: '{music_service}'")
+#    return music_service_mapping[music_service](music_service, provider_logging_level)
 
 
 class MusicproviderBase(WhoamiObject):
     music_service = None
     provider_logging_level = None
+
+    @classmethod
+    def create(cls, music_service, music_service_config, provider_logging_level=CRITICAL):
+        """
+        Create music provider object of specified type.
+        music_service_config may contain all services dict (then dict member for certain service will be used for it)
+        or it may contain music service's config only.
+        Do not use keys identical to services id in per-service configs.
+        :param music_service: id of music service
+        :param music_service_config: user's config of music service.
+        :param provider_logging_level: log level for provider, default is CRITICAL
+        :return: object of appropriate Musicprovider* class
+        """
+        msc = None
+        if music_service in music_service_config:
+            msc = music_service_config[music_service]
+        else:
+            msc = music_service_config
+        return music_service_mapping[music_service](music_service, msc, provider_logging_level)
 
     def __str__(self):
         return self.__repr__()
@@ -20,7 +39,7 @@ class MusicproviderBase(WhoamiObject):
     def __repr__(self):
         return f"{self.__class__.__name__}(music_service={self.music_service})"
 
-    def __init__(self, music_service, provider_logging_level=CRITICAL):
+    def __init__(self, music_service, music_service_config, provider_logging_level=CRITICAL):
         if self.music_service != music_service:
             raise ExBpmcrawlGeneric(f"Internal error: tried to init {self.__class__.__name__} with wrong service provider '{self.music_service}'")
         self.set_provider_logging_level(provider_logging_level)

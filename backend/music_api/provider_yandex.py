@@ -33,19 +33,13 @@ class MusicproviderYandexMusic(MusicproviderBase):
     client = None
     artist_pager = {}
 
-    def __init__(self, music_service, provider_logging_level=CRITICAL):
+    def __init__(self, music_service, music_service_config, provider_logging_level=CRITICAL):
 
-        super(MusicproviderYandexMusic, self).__init__(music_service, provider_logging_level)
-        if not self.token:
-            self.token = os.environ.get(self.token_env_var, None)
-        if not self.token:
-            raise ExBpmcrawlGeneric(
-                f"You need to set {self.token_env_var} environment variable.\n"
-                f"To obtain token (use python3, and venv if you need):\n"
-                f"pip install selenium webdriver_manager\n"
-                f"python3 yandex-get-token.py\n"
-                f"(browser will start, and then after all manipulations token will be printed to stdout)"
-            )
+        super(MusicproviderYandexMusic, self).__init__(music_service, music_service_config, provider_logging_level)
+        try:
+            self.token = music_service_config['token']
+        except Exception:
+            raise ExBpmcrawlGeneric(f"No yandex music token provided")
 
     def set_provider_logging_level(self, provider_logging_level):
         super(MusicproviderYandexMusic, self).set_provider_logging_level(provider_logging_level)

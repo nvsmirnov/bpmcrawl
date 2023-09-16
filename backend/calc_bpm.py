@@ -2,12 +2,11 @@ __all__ = ["calc_file_bpm_histogram"]
 
 # from collections import OrderedDict
 
-import essentia
-
 # NB on using essentia.standard:
 #   it is ok to have unresolved names from essentia.standard because they are created runtime
 #   so if you unsure (maybe something changed with a time passed),
 #   you may try to import and call them in python console
+import essentia
 import essentia.standard
 
 from backend.log import *
@@ -20,7 +19,7 @@ essentia.log.warningActive = False
 def calc_file_bpm_histogram(filename):
     """Analyze filename, get average BPM and calculate DPB histogram
     :returns dict: { bpm(int): bpm_share(float) }
-    :raises ExcBpmCrawlGeneric on error
+    :raises ExcBpmcrawlGeneric on error
     """
 
     bpm = None

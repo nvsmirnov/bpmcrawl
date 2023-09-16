@@ -1,5 +1,7 @@
 #
 # TODO: this code copied from original branch without checking that it works. It should. Probably.
+# TODO: but certainly authentication needs to be rewritten:
+#       need to get user music provider's identity from music_service_config
 #
 
 from .base import MusicproviderBase
