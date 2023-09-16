@@ -3,6 +3,7 @@ __all__ = ['connect']
 from pymongo import MongoClient
 import os
 
+
 def connect():
     db_username = os.environ.get('DB_USERNAME')
     db_password = os.environ.get('DB_PASSWORD')

@@ -48,11 +48,11 @@ db.histograms.insertMany([
         "service": "sampleservice",
         "track_id": "sample_track_id", // track id in the service
         "histogram": { 90: 0.9, 181: 0.1, },
-        "from_playlists": {
+        "from_playlists": { // think of it, may be track-playlist links should be made otherwise
             "sampleservice/sample@sample.nonexistent/sample_playlist_id": 1, // playlist ids are service-specific - service_playlist_id
         },
-        "timestamp_last_job_scheduled": 0, // when last update job was scheduled
-        "timestamp_last_job_finished": 0, // when last update job finished
+        "created_at": null, // when it was created
+        "created_by": "some_worker_job_uri and id",
     },
 ]);
 
